@@ -1,0 +1,88 @@
+@import 'tailwindcss';
+
+/**
+ * The Clear Brands identity, carried over from the original build as design
+ * tokens. The palette and the type are theirs and they are good — near-black
+ * ground, volt accent, Archivo Black headings, tabular figures on every money
+ * column. What changes in the rebuild is the interaction layer, not the look.
+ *
+ * Tokens, not literals: white-labelling per partner later is then a data change
+ * (partners.brand_accent) rather than a search-and-replace.
+ */
+@theme {
+  --color-ink: #0d0d0f;
+  --color-surface: #141417;
+  --color-surface-2: #1b1b1f;
+  --color-line: #26262b;
+  --color-line-strong: #3a3a42;
+  --color-volt: #c8f52f;
+  --color-volt-dim: rgb(200 245 47 / 0.14);
+  --color-paper: #f4f4f5;
+  --color-muted: #9a9aa3;
+  --color-danger: #ff5a5a;
+  --color-warn: #e5b84b;
+  --color-ok: #7fb818;
+
+  --font-head: 'Archivo Black', 'Archivo', system-ui, sans-serif;
+  --font-body: 'Archivo', system-ui, -apple-system, sans-serif;
+
+  --radius-card: 12px;
+  --radius-control: 8px;
+  --radius-pill: 99px;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  background: var(--color-ink);
+}
+
+body {
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Money and counts always line up. */
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* A visible focus ring everywhere. The original destroyed focus on every render
+   and restored it for eight specific inputs by hand. */
+:focus-visible {
+  outline: 2px solid var(--color-volt);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-surface);
+}
+::-webkit-scrollbar-thumb {
+  background: #2c2c33;
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-line-strong);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

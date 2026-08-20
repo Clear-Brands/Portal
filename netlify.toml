@@ -1,0 +1,29 @@
+# Netlify build configuration.
+#
+# Nothing here is secret. Environment variables are set in the Netlify UI under
+# Site configuration > Environment variables:
+#
+#   NEXT_PUBLIC_SUPABASE_URL          the project URL
+#   NEXT_PUBLIC_SUPABASE_ANON_KEY     the publishable key
+#   SUPABASE_SERVICE_ROLE_KEY         server-only, never NEXT_PUBLIC_
+#   NEXT_PUBLIC_SITE_URL              the deployed URL (per-context, see below)
+#   GHL_WEBHOOK_URL / GHL_WEBHOOK_SECRET
+#   RESEND_API_KEY
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+  NPM_FLAGS = "--no-audit --no-fund"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Deploy previews point at the staging Supabase project, never production.
+[context.deploy-preview.environment]
+  NEXT_PUBLIC_SITE_URL = "$DEPLOY_PRIME_URL"
+
+[context.branch-deploy.environment]
+  NEXT_PUBLIC_SITE_URL = "$DEPLOY_PRIME_URL"

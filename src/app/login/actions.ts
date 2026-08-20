@@ -1,0 +1,98 @@
+'use server'
+
+import { redirect } from 'next/navigation'
+import type { Route } from 'next'
+import { z } from 'zod'
+
+import { createClient } from '@/lib/supabase/server'
+
+/**
+ * Password sign-in is the everyday path; the magic link is kept for invitations
+ * and resets.
+ *
+ * The original was passwordless only, which means an email on every single
+ * login. Supabase's built-in auth mail is rate-limited to a couple of messages
+ * an hour and explicitly not for production, so at 500 users that is the first
+ * thing that breaks — on any plan. It is also poor on a phone, where a rep
+ * checking their earnings gets bounced through an inbox into the wrong browser.
+ */
+
+const Credentials = z.object({
+  email: z.email('Enter a valid email address'),
+  password: z.string().min(1, 'Enter your password'),
+  next: z.string().optional(),
+})
+
+const EmailOnly = z.object({
+  email: z.email('Enter a valid email address'),
+})
+
+export type AuthState = { error?: string; sent?: boolean }
+
+export async function signInWithPassword(
+  _prev: AuthState,
+  formData: FormData,
+): Promise<AuthState> {
+  const parsed = Credentials.safeParse({
+    email: formData.get('email'),
+    password: formData.get('password'),
+    next: formData.get('next') ?? undefined,
+  })
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Check the form and try again' }
+  }
+
+  const supabase = await createClient()
+  const { error } = await supabase.auth.signInWithPassword({
+    email: parsed.data.email,
+    password: parsed.data.password,
+  })
+
+  if (error) {
+    // Deliberately does not distinguish "no such account" from "wrong password":
+    // that difference tells an attacker which addresses are real.
+    return { error: 'That email and password do not match. Try again, or use a sign-in link.' }
+  }
+
+  // Only ever redirect to a path on this origin. `as Route` is needed because
+  // typedRoutes cannot know a runtime string is a real route; the startsWith
+  // guard is what actually keeps this from becoming an open redirect.
+  const next = parsed.data.next
+  const destination = next && next.startsWith('/') && !next.startsWith('//') ? next : '/'
+  redirect(destination as Route)
+}
+
+export async function sendSignInLink(
+  _prev: AuthState,
+  formData: FormData,
+): Promise<AuthState> {
+  const parsed = EmailOnly.safeParse({ email: formData.get('email') })
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Enter a valid email address' }
+  }
+
+  const supabase = await createClient()
+  const { error } = await supabase.auth.signInWithOtp({
+    email: parsed.data.email,
+    options: {
+      shouldCreateUser: false, // Only people already on the roster get a link.
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+    },
+  })
+
+  if (error) {
+    return { error: 'We could not send that link right now. Try again in a moment.' }
+  }
+
+  // Always reports success, whether or not the address exists — otherwise this
+  // form becomes a way to enumerate who works there.
+  return { sent: true }
+}
+
+export async function signOut() {
+  const supabase = await createClient()
+  await supabase.auth.signOut()
+  redirect('/login')
+}

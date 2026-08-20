@@ -1,0 +1,112 @@
+import Link from 'next/link'
+
+import { signOut } from '@/app/login/actions'
+import { can, type Capability } from '@/lib/auth/capabilities'
+import { requireSession } from '@/lib/session'
+import { cn } from '@/components/ui'
+
+/**
+ * The portal shell.
+ *
+ * Navigation is real routing, not CSS visibility. The original rendered every
+ * screen for every role into a single string on each interaction and toggled
+ * which one was displayed — which is why typing in a search box rebuilt about a
+ * thousand lines of markup per keystroke.
+ */
+
+type NavItem = {
+  href: string
+  label: string
+  capability?: Capability
+}
+
+const NAV: Record<string, NavItem[]> = {
+  internal: [
+    { href: '/', label: 'Dashboard' },
+    { href: '/deals', label: 'Deals', capability: 'deals.write' },
+    { href: '/payouts', label: 'Payouts', capability: 'payouts.view' },
+    { href: '/revshare', label: 'Rev share', capability: 'revshare.view' },
+    { href: '/programs', label: 'Programs', capability: 'competitions.view' },
+    { href: '/roster', label: 'Team', capability: 'people.write' },
+    { href: '/partners', label: 'Partners', capability: 'partners.write' },
+    { href: '/activity', label: 'Activity', capability: 'activity.view' },
+  ],
+  partner_admin: [
+    { href: '/', label: 'Dashboard' },
+    { href: '/deals', label: 'Deals' },
+    { href: '/payouts', label: 'Payouts', capability: 'payouts.view' },
+    { href: '/revshare', label: 'Rev share', capability: 'revshare.view' },
+    { href: '/programs', label: 'Programs', capability: 'competitions.view' },
+    { href: '/roster', label: 'Your team' },
+  ],
+  member: [
+    { href: '/', label: 'Dashboard' },
+    { href: '/my-deals', label: 'My deals' },
+    { href: '/programs', label: 'Competitions', capability: 'competitions.view' },
+  ],
+}
+
+const ROLE_LABEL: Record<string, string> = {
+  internal: 'Clear Brands',
+  partner_admin: 'Partner admin',
+  member: 'Member',
+}
+
+export default async function PortalLayout({ children }: { children: React.ReactNode }) {
+  const profile = await requireSession()
+  const items = (NAV[profile.role] ?? []).filter((i) => !i.capability || can(profile, i.capability))
+
+  return (
+    <div className="min-h-dvh">
+      <header className="sticky top-0 z-40 border-b border-line bg-ink/85 backdrop-blur-[10px]">
+        <div className="mx-auto flex max-w-[1200px] items-center gap-4 px-7 py-3.5 max-sm:px-4">
+          <Link href="/" className="font-head text-[15px] tracking-[0.02em] text-paper">
+            Clear Brands
+          </Link>
+          <span className="font-head text-[11px] tracking-[0.25em] text-muted uppercase max-sm:hidden">
+            Partner Portal
+          </span>
+
+          <div className="ml-auto flex items-center gap-3">
+            <span className="text-[12.5px] text-muted max-sm:hidden">
+              {profile.name} · {ROLE_LABEL[profile.role]}
+            </span>
+            <form action={signOut}>
+              <button
+                type="submit"
+                className="rounded-[7px] border border-line px-2.5 py-1.5 text-[12.5px] text-muted hover:bg-white/5 hover:text-paper"
+              >
+                Sign out
+              </button>
+            </form>
+          </div>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-[1200px] px-7 pt-8 pb-24 max-sm:px-4 lg:grid lg:grid-cols-[212px_minmax(0,1fr)] lg:gap-x-11">
+        <nav
+          aria-label="Sections"
+          className="mb-7 lg:sticky lg:top-[86px] lg:mb-0 lg:self-start"
+        >
+          <ul className="flex gap-1.5 overflow-x-auto lg:flex-col lg:overflow-visible">
+            {items.map((item) => (
+              <li key={item.href} className="flex-none lg:flex-auto">
+                <Link
+                  href={item.href as never}
+                  className={cn(
+                    'block rounded-[7px] px-3 py-2 text-[13.5px] whitespace-nowrap text-muted',
+                    'hover:bg-white/5 hover:text-paper',
+                  )}
+                >
+                  {item.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        <main className="min-w-0">{children}</main>
+      </div>
+    </div>
+  )
+}
