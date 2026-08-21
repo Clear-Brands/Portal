@@ -306,6 +306,64 @@ begin
   perform pg_temp.ok('nobody can delete a payout', v_failed);
 end $$;
 
+do $$ begin raise notice ''; raise notice 'PROGRAMMES — the same capability model, not a fifth system'; end $$;
+
+reset role;
+select pg_temp.become('jordan@clearbrands.io');   -- internal, access = manager: programs.write, not payouts.write
+set role authenticated;
+
+-- Internal staff have no fixed partner_id on their profile — they switch
+-- partners through the app's cookie, not through my_partner_id() — so the
+-- partner comes from the seed id here, exactly as getActivePartner() supplies
+-- partner.id explicitly in the real insert.
+do $$
+declare v_id uuid;
+begin
+  insert into competitions (partner_id, name, start_date, end_date, min_closes)
+  values (pg_temp.sid('p_fp'), 'Manager-created blitz', current_date, current_date + 7, 1)
+  returning id into v_id;
+  perform pg_temp.ok('a Clear Brands manager (programs.write) can create a competition', v_id is not null);
+end $$;
+
+do $$
+declare v_failed boolean := false;
+begin
+  begin
+    insert into goal_awards (partner_id, goal_id, person_id, approved_at, approved_by_name)
+    values (pg_temp.sid('p_fp'), pg_temp.sid('ag1'), pg_temp.sid('r1'), current_date, 'Jordan Wells');
+  exception when others then v_failed := true;
+  end;
+  perform pg_temp.ok('a Clear Brands manager cannot approve a goal prize (needs payouts.write)', v_failed);
+end $$;
+
+reset role;
+select pg_temp.become('partners@fieldpulse.com');   -- partner admin: no programs.write
+set role authenticated;
+
+do $$
+declare v_failed boolean := false;
+begin
+  begin
+    insert into competitions (partner_id, name, start_date, end_date, min_closes)
+    values (public.my_partner_id(), 'Partner-created blitz', current_date, current_date + 7, 1);
+  exception when others then v_failed := true;
+  end;
+  perform pg_temp.ok('a partner admin cannot create a competition', v_failed);
+end $$;
+
+reset role;
+select pg_temp.become('team@clearbrands.io');   -- internal admin: holds every capability
+set role authenticated;
+
+do $$
+declare v_goal_id uuid;
+begin
+  insert into goal_awards (partner_id, goal_id, person_id, approved_at, approved_by_name)
+  values (pg_temp.sid('p_fp'), pg_temp.sid('ag1'), pg_temp.sid('r1'), current_date, 'Cristian Vega')
+  returning goal_id into v_goal_id;
+  perform pg_temp.ok('a Clear Brands admin (payouts.write) can approve a goal prize', v_goal_id is not null);
+end $$;
+
 do $$ begin raise notice ''; raise notice 'DEACTIVATION — a paused member is refused, not merely hidden'; end $$;
 
 reset role;
