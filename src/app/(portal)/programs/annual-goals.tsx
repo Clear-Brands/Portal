@@ -1,4 +1,4 @@
-import { Card, Pill, SectionHeading, fmtCount } from '@/components/ui'
+import { Card, Pill, SectionHeading, fmtCount, fmtDate } from '@/components/ui'
 import type { AnnualGoal } from '@/lib/data/programs'
 import { GoalAwardButton } from './goal-award-button'
 
@@ -25,7 +25,7 @@ export function AnnualGoalsSection({ goals, canApprove }: { goals: AnnualGoal[];
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="font-head text-[11px] tracking-[0.15em] text-muted uppercase">
-                    {goal.teamName ?? 'Everyone'} · {goal.startDate} &ndash; {goal.endDate}
+                    {goal.teamName ?? 'Everyone'} · {fmtDate(goal.startDate)} &ndash; {fmtDate(goal.endDate)}
                   </p>
                   <h3 className="mt-1 font-head text-[19px] leading-tight text-paper">
                     {fmtCount(goal.target)} closes &rarr; {goal.prize || 'prize not set'}

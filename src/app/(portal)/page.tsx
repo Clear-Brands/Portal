@@ -1,3 +1,5 @@
+import Link from 'next/link'
+
 import { can } from '@/lib/auth/capabilities'
 import { requireSession } from '@/lib/session'
 import { createClient } from '@/lib/supabase/server'
@@ -76,54 +78,98 @@ export default async function DashboardPage() {
         {rows.length === 0 ? (
           <Card>
             <p className="text-[14px] text-muted">
-              Nothing here yet. Once deals start coming in, this fills up.
+              {isInternal ? (
+                <>
+                  No partners yet.{' '}
+                  <Link href="/partners/new" className="text-volt underline underline-offset-4">
+                    Onboard your first one
+                  </Link>{' '}
+                  to see rollups here.
+                </>
+              ) : (
+                <>
+                  Nothing here yet — once a deal is submitted for your program, it&rsquo;ll show up
+                  in this rollup.
+                </>
+              )}
             </p>
           </Card>
         ) : (
-          <Card className="overflow-x-auto p-0">
-            <table className="w-full min-w-[620px] border-collapse">
-              <thead>
-                <tr>
-                  {['Partner', 'Pods', 'People', 'Open', 'Payable now', 'Lifetime paid'].map(
-                    (h, i) => (
-                      <th
-                        key={h}
-                        className={`border-b border-line-strong px-[22px] py-3 font-head text-[11px] tracking-[0.15em] text-muted uppercase ${
-                          i > 1 ? 'text-right' : 'text-left'
-                        }`}
-                      >
-                        {h}
-                      </th>
-                    ),
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.partner_id as string} className="hover:bg-white/[0.025]">
-                    <td className="border-b border-line px-[22px] py-3.5 text-[14px] text-paper">
-                      {r.name as string}
-                    </td>
-                    <td className="num border-b border-line px-[22px] py-3.5 text-[14px] text-muted">
-                      {fmtCount(r.team_count as number)}
-                    </td>
-                    <td className="num border-b border-line px-[22px] py-3.5 text-right text-[14px] text-muted">
-                      {fmtCount(r.active_people as number)}
-                    </td>
-                    <td className="num border-b border-line px-[22px] py-3.5 text-right text-[14px] text-muted">
-                      {fmtCount(r.open_deals as number)}
-                    </td>
-                    <td className="num border-b border-line px-[22px] py-3.5 text-right text-[14px] text-volt">
-                      {fmtMoney(r.payable_now as number, true)}
-                    </td>
-                    <td className="num border-b border-line px-[22px] py-3.5 text-right text-[14px] text-muted">
-                      {fmtMoney(r.lifetime_paid as number, true)}
-                    </td>
+          <>
+            <div className="grid gap-2.5 sm:hidden">
+              {rows.map((r) => (
+                <Card key={r.partner_id as string}>
+                  <div className="text-paper">{r.name as string}</div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 border-t border-line pt-3 text-[13px]">
+                    <div>
+                      <div className="text-[11px] text-muted uppercase">Pods</div>
+                      <span className="num text-muted">{fmtCount(r.team_count as number)}</span>
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-muted uppercase">People</div>
+                      <span className="num text-muted">{fmtCount(r.active_people as number)}</span>
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-muted uppercase">Open</div>
+                      <span className="num text-muted">{fmtCount(r.open_deals as number)}</span>
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-muted uppercase">Payable now</div>
+                      <span className="num text-volt">{fmtMoney(r.payable_now as number, true)}</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-[12px] text-muted">
+                    <span className="num">{fmtMoney(r.lifetime_paid as number, true)}</span> lifetime paid
+                  </div>
+                </Card>
+              ))}
+            </div>
+
+            <Card className="hidden overflow-x-auto p-0 sm:block">
+              <table className="w-full min-w-[620px] border-collapse">
+                <thead>
+                  <tr>
+                    {['Partner', 'Pods', 'People', 'Open', 'Payable now', 'Lifetime paid'].map(
+                      (h, i) => (
+                        <th
+                          key={h}
+                          className={`border-b border-line-strong px-[22px] py-3 font-head text-[11px] tracking-[0.15em] text-muted uppercase ${
+                            i > 1 ? 'text-right' : 'text-left'
+                          }`}
+                        >
+                          {h}
+                        </th>
+                      ),
+                    )}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </Card>
+                </thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr key={r.partner_id as string} className="hover:bg-white/[0.025]">
+                      <td className="border-b border-line px-[22px] py-3.5 text-[14px] text-paper">
+                        {r.name as string}
+                      </td>
+                      <td className="num border-b border-line px-[22px] py-3.5 text-[14px] text-muted">
+                        {fmtCount(r.team_count as number)}
+                      </td>
+                      <td className="num border-b border-line px-[22px] py-3.5 text-right text-[14px] text-muted">
+                        {fmtCount(r.active_people as number)}
+                      </td>
+                      <td className="num border-b border-line px-[22px] py-3.5 text-right text-[14px] text-muted">
+                        {fmtCount(r.open_deals as number)}
+                      </td>
+                      <td className="num border-b border-line px-[22px] py-3.5 text-right text-[14px] text-volt">
+                        {fmtMoney(r.payable_now as number, true)}
+                      </td>
+                      <td className="num border-b border-line px-[22px] py-3.5 text-right text-[14px] text-muted">
+                        {fmtMoney(r.lifetime_paid as number, true)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Card>
+          </>
         )}
       </section>
 

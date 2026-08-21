@@ -3,7 +3,7 @@ import { requireSession } from '@/lib/session'
 import { getActivePartner } from '@/lib/partner-context'
 import { listDeals, summariseDeals } from '@/lib/data/deals'
 import { parseFilters, toSearchParams } from '@/lib/deals/filters'
-import { Card, Eyebrow, Pill, SectionHeading, fmtCount, fmtMoney } from '@/components/ui'
+import { Card, Eyebrow, Pill, SectionHeading, fmtCount, fmtDate, fmtMoney } from '@/components/ui'
 import { Pagination } from '@/components/pagination'
 import { SubmitDealForm } from './submit-form'
 
@@ -62,48 +62,77 @@ export default async function MyDealsPage({
             </p>
           </Card>
         ) : (
-          <Card className="overflow-x-auto p-0">
-            <table className="w-full min-w-[560px] border-collapse">
-              <thead>
-                <tr>
-                  {['Client', 'Status', ...(showMoney ? ['Spiff'] : []), 'Sent'].map((h, i) => (
-                    <th
-                      key={h}
-                      className={`border-b border-line-strong px-[22px] py-3 font-head text-[11px] tracking-[0.15em] text-muted uppercase ${
-                        i > 1 ? 'text-right' : 'text-left'
-                      }`}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {page.rows.map((deal) => (
-                  <tr key={deal.id} className="align-top hover:bg-white/[0.025]">
-                    <td className="border-b border-line px-[22px] py-3.5 text-[14px]">
-                      <div className="text-paper">{deal.clientName}</div>
+          <>
+            <div className="grid gap-2.5 sm:hidden">
+              {page.rows.map((deal) => (
+                <Card key={deal.id}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-paper">{deal.clientName}</div>
                       <div className="text-[12px] text-muted">{deal.service || '—'}</div>
-                    </td>
-                    <td className="border-b border-line px-[22px] py-3.5">
+                    </div>
+                    <span className="num shrink-0 text-[12px] text-muted">
+                      {fmtDate(deal.createdAt)}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between border-t border-line pt-3">
+                    <div>
                       <Pill tone={deal.status} />
                       {deal.status === 'lost' && deal.lostReason ? (
                         <div className="mt-1 text-[11.5px] text-muted">{deal.lostReason}</div>
                       ) : null}
-                    </td>
+                    </div>
                     {showMoney ? (
-                      <td className="num border-b border-line px-[22px] py-3.5 text-right text-[14px] text-paper">
-                        {fmtMoney(deal.spiffAmount, true)}
-                      </td>
+                      <span className="num text-paper">{fmtMoney(deal.spiffAmount, true)}</span>
                     ) : null}
-                    <td className="num border-b border-line px-[22px] py-3.5 text-right text-[14px] text-muted">
-                      {deal.createdAt.slice(0, 10)}
-                    </td>
+                  </div>
+                </Card>
+              ))}
+            </div>
+
+            <Card className="hidden overflow-x-auto p-0 sm:block">
+              <table className="w-full min-w-[560px] border-collapse">
+                <thead>
+                  <tr>
+                    {['Client', 'Status', ...(showMoney ? ['Spiff'] : []), 'Sent'].map((h, i) => (
+                      <th
+                        key={h}
+                        className={`border-b border-line-strong px-[22px] py-3 font-head text-[11px] tracking-[0.15em] text-muted uppercase ${
+                          i > 1 ? 'text-right' : 'text-left'
+                        }`}
+                      >
+                        {h}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </Card>
+                </thead>
+                <tbody>
+                  {page.rows.map((deal) => (
+                    <tr key={deal.id} className="align-top hover:bg-white/[0.025]">
+                      <td className="border-b border-line px-[22px] py-3.5 text-[14px]">
+                        <div className="text-paper">{deal.clientName}</div>
+                        <div className="text-[12px] text-muted">{deal.service || '—'}</div>
+                      </td>
+                      <td className="border-b border-line px-[22px] py-3.5">
+                        <Pill tone={deal.status} />
+                        {deal.status === 'lost' && deal.lostReason ? (
+                          <div className="mt-1 text-[11.5px] text-muted">{deal.lostReason}</div>
+                        ) : null}
+                      </td>
+                      {showMoney ? (
+                        <td className="num border-b border-line px-[22px] py-3.5 text-right text-[14px] text-paper">
+                          {fmtMoney(deal.spiffAmount, true)}
+                        </td>
+                      ) : null}
+                      <td className="num border-b border-line px-[22px] py-3.5 text-right text-[14px] text-muted">
+                        {fmtDate(deal.createdAt)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Card>
+          </>
         )}
 
         <Pagination

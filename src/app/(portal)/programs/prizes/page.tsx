@@ -53,56 +53,95 @@ export default async function PrizesPage() {
           <p className="text-[14px] text-muted">Nobody is in prize position yet.</p>
         </Card>
       ) : (
-        <Card>
-          <SectionHeading>Prize list</SectionHeading>
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[640px] border-collapse text-[13.5px]">
-              <thead>
-                <tr className="border-b border-line text-left text-muted">
-                  <th className="pb-2.5 pr-3 font-head text-[11px] tracking-[0.1em] uppercase">Program</th>
-                  <th className="pb-2.5 pr-3 font-head text-[11px] tracking-[0.1em] uppercase">Who</th>
-                  <th className="pb-2.5 pr-3 font-head text-[11px] tracking-[0.1em] uppercase">Prize</th>
-                  <th className="pb-2.5 pr-3 font-head text-[11px] tracking-[0.1em] uppercase">Status</th>
-                  {canApprove ? <th className="pb-2.5 font-head text-[11px] tracking-[0.1em] uppercase" /> : null}
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.map((line, i) => (
-                  <tr key={i} className="border-b border-line last:border-b-0">
-                    <td className="py-2.5 pr-3 text-muted">
-                      {SOURCE_LABEL[line.source]}
-                      <div className="text-paper">{line.sourceName}</div>
-                    </td>
-                    <td className="py-2.5 pr-3 text-paper">
-                      {line.personName}
-                      {line.teamName && line.source !== 'sprint_team' ? (
-                        <span className="text-muted"> · {line.teamName}</span>
-                      ) : null}
-                    </td>
-                    <td className="py-2.5 pr-3 text-volt">{line.prize}</td>
-                    <td className="py-2.5 pr-3">
-                      <Pill tone={STATUS_TONE[line.status]}>{PRIZE_STATUS_LABEL[line.status]}</Pill>
-                    </td>
-                    {canApprove ? (
-                      <td className="py-2.5 text-right">
-                        {line.status === 'awaiting_approval' && line.goalId && line.personId ? (
-                          <GoalAwardButton
-                            goalId={line.goalId}
-                            personId={line.personId}
-                            personName={line.personName}
-                            prize={line.prize}
-                            closes={line.closes ?? 0}
-                            target={line.target ?? 0}
-                          />
+        <>
+          <div className="grid gap-2.5 sm:hidden">
+            {sorted.map((line, i) => (
+              <Card key={i}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[11px] text-muted uppercase">{SOURCE_LABEL[line.source]}</div>
+                    <div className="truncate text-paper">{line.sourceName}</div>
+                  </div>
+                  <Pill tone={STATUS_TONE[line.status]}>{PRIZE_STATUS_LABEL[line.status]}</Pill>
+                </div>
+
+                <div className="mt-3 flex items-center justify-between border-t border-line pt-3 text-[13.5px]">
+                  <div>
+                    <span className="text-paper">{line.personName}</span>
+                    {line.teamName && line.source !== 'sprint_team' ? (
+                      <span className="text-muted"> · {line.teamName}</span>
+                    ) : null}
+                  </div>
+                  <span className="text-volt">{line.prize}</span>
+                </div>
+
+                {canApprove && line.status === 'awaiting_approval' && line.goalId && line.personId ? (
+                  <div className="mt-3 flex justify-end border-t border-line pt-3">
+                    <GoalAwardButton
+                      goalId={line.goalId}
+                      personId={line.personId}
+                      personName={line.personName}
+                      prize={line.prize}
+                      closes={line.closes ?? 0}
+                      target={line.target ?? 0}
+                    />
+                  </div>
+                ) : null}
+              </Card>
+            ))}
+          </div>
+
+          <Card className="hidden sm:block">
+            <SectionHeading>Prize list</SectionHeading>
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full min-w-[640px] border-collapse text-[13.5px]">
+                <thead>
+                  <tr className="border-b border-line text-left text-muted">
+                    <th className="pb-2.5 pr-3 font-head text-[11px] tracking-[0.1em] uppercase">Program</th>
+                    <th className="pb-2.5 pr-3 font-head text-[11px] tracking-[0.1em] uppercase">Who</th>
+                    <th className="pb-2.5 pr-3 font-head text-[11px] tracking-[0.1em] uppercase">Prize</th>
+                    <th className="pb-2.5 pr-3 font-head text-[11px] tracking-[0.1em] uppercase">Status</th>
+                    {canApprove ? <th className="pb-2.5 font-head text-[11px] tracking-[0.1em] uppercase" /> : null}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sorted.map((line, i) => (
+                    <tr key={i} className="border-b border-line last:border-b-0">
+                      <td className="py-2.5 pr-3 text-muted">
+                        {SOURCE_LABEL[line.source]}
+                        <div className="text-paper">{line.sourceName}</div>
+                      </td>
+                      <td className="py-2.5 pr-3 text-paper">
+                        {line.personName}
+                        {line.teamName && line.source !== 'sprint_team' ? (
+                          <span className="text-muted"> · {line.teamName}</span>
                         ) : null}
                       </td>
-                    ) : null}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+                      <td className="py-2.5 pr-3 text-volt">{line.prize}</td>
+                      <td className="py-2.5 pr-3">
+                        <Pill tone={STATUS_TONE[line.status]}>{PRIZE_STATUS_LABEL[line.status]}</Pill>
+                      </td>
+                      {canApprove ? (
+                        <td className="py-2.5 text-right">
+                          {line.status === 'awaiting_approval' && line.goalId && line.personId ? (
+                            <GoalAwardButton
+                              goalId={line.goalId}
+                              personId={line.personId}
+                              personName={line.personName}
+                              prize={line.prize}
+                              closes={line.closes ?? 0}
+                              target={line.target ?? 0}
+                            />
+                          ) : null}
+                        </td>
+                      ) : null}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </>
       )}
     </>
   )

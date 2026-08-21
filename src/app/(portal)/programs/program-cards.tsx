@@ -1,4 +1,4 @@
-import { Card, Pill, fmtCount, fmtMoney } from '@/components/ui'
+import { Card, Pill, fmtCount, fmtDate, fmtMoney } from '@/components/ui'
 import type { Competition, Sprint } from '@/lib/data/programs'
 
 /**
@@ -7,11 +7,9 @@ import type { Competition, Sprint } from '@/lib/data/programs'
  */
 
 function DateRange({ start, end }: { start: string; end: string }) {
-  const fmt = (d: string) =>
-    new Date(`${d}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   return (
     <span className="text-[12.5px] text-muted">
-      {fmt(start)} &ndash; {fmt(end)}
+      {fmtDate(start)} &ndash; {fmtDate(end)}
     </span>
   )
 }

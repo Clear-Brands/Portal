@@ -34,7 +34,40 @@ export default async function ClearBrandsTeamPage() {
         </p>
       </div>
 
-      <Card className="overflow-x-auto p-0">
+      <div className="grid gap-2.5 sm:hidden">
+        {logins.map((login) => (
+          <Card key={login.id}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="truncate text-paper">{login.name}</div>
+                <div className="truncate text-[12px] text-muted">{login.email}</div>
+              </div>
+              <Pill tone={login.access === 'admin' ? 'closed' : 'neutral'}>
+                {ACCESS_LABEL[login.access]}
+              </Pill>
+            </div>
+            <div className="mt-3 flex justify-end border-t border-line pt-3">
+              {login.access === 'admin' ? (
+                <span className="text-[12.5px] text-muted">Holds everything</span>
+              ) : login.userId === profile.userId ? (
+                <span className="text-[12.5px] text-muted">This is you</span>
+              ) : (
+                <PermissionGridButton
+                  login={{
+                    profileId: login.id,
+                    name: login.name,
+                    role: login.role,
+                    access: login.access,
+                    perms: login.perms,
+                  }}
+                />
+              )}
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      <Card className="hidden overflow-x-auto p-0 sm:block">
         <table className="w-full min-w-[620px] border-collapse">
           <thead>
             <tr>

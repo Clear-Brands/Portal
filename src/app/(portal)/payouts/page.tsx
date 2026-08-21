@@ -3,7 +3,7 @@ import { requireSession } from '@/lib/session'
 import { getActivePartner } from '@/lib/partner-context'
 import { batchTotals, groupBatchByPerson, listPayableBatch } from '@/lib/data/deals'
 import { listPayouts, payoutHeadline } from '@/lib/data/payouts'
-import { Card, Eyebrow, Pill, SectionHeading, Button, fmtCount, fmtMoney } from '@/components/ui'
+import { Card, Eyebrow, Pill, SectionHeading, Button, fmtCount, fmtDate, fmtMoney } from '@/components/ui'
 import { RecordPayoutButton, VoidPayoutButton } from './payout-controls'
 
 export const metadata = { title: 'Payouts' }
@@ -182,7 +182,7 @@ export default async function PayoutsPage() {
                       {payout.voidedAt ? <Pill tone="lost">Voided</Pill> : null}
                     </div>
                     <p className="mt-1 text-[13px] text-muted">
-                      {payout.paidDate} · ref {payout.reference}
+                      {fmtDate(payout.paidDate)} · ref {payout.reference}
                       {payout.compTotal > 0 ? (
                         <>
                           {' '}

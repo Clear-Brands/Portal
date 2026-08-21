@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { signOut } from '@/app/login/actions'
 import { can, type Capability } from '@/lib/auth/capabilities'
 import { requireSession } from '@/lib/session'
-import { cn } from '@/components/ui'
+import { NavLinks } from './nav-links'
 
 /**
  * The portal shell.
@@ -88,21 +88,7 @@ export default async function PortalLayout({ children }: { children: React.React
           aria-label="Sections"
           className="mb-7 lg:sticky lg:top-[86px] lg:mb-0 lg:self-start"
         >
-          <ul className="flex gap-1.5 overflow-x-auto lg:flex-col lg:overflow-visible">
-            {items.map((item) => (
-              <li key={item.href} className="flex-none lg:flex-auto">
-                <Link
-                  href={item.href}
-                  className={cn(
-                    'block rounded-[7px] px-3 py-2 text-[13.5px] whitespace-nowrap text-muted',
-                    'hover:bg-white/5 hover:text-paper',
-                  )}
-                >
-                  {item.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <NavLinks items={items} />
         </nav>
 
         <main className="min-w-0">{children}</main>

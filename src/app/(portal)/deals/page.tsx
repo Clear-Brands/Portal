@@ -94,64 +94,113 @@ export default async function DealsPage({
           </p>
         </Card>
       ) : (
-        <Card className="overflow-x-auto p-0">
-          <table className="w-full min-w-[860px] border-collapse">
-            <thead>
-              <tr>
-                <Th>Client</Th>
-                <Th>Rep</Th>
-                <Th>Status</Th>
-                {showMoney ? <Th align="right">Spiff</Th> : null}
-                <Th align="right">Age</Th>
-                {canWrite ? <Th align="right">Actions</Th> : null}
-              </tr>
-            </thead>
-            <tbody>
-              {page.rows.map((deal) => (
-                <tr key={deal.id} className="align-top hover:bg-white/[0.025]">
-                  <Td>
-                    <div className="text-paper">{deal.clientName}</div>
+        <>
+          <div className="grid gap-2.5 sm:hidden">
+            {page.rows.map((deal) => (
+              <Card key={deal.id}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-paper">{deal.clientName}</div>
                     <div className="text-[12px] text-muted">
                       {[deal.service, [deal.city, deal.state].filter(Boolean).join(', ')]
                         .filter(Boolean)
                         .join(' · ') || '—'}
                     </div>
-                    {deal.promoNote ? (
-                      <div className="mt-1 text-[12px] text-muted italic">{deal.promoNote}</div>
-                    ) : null}
-                  </Td>
-                  <Td>
+                  </div>
+                  <span className="num shrink-0 text-[12px] text-muted">{deal.ageDays}d</span>
+                </div>
+
+                {deal.promoNote ? (
+                  <div className="mt-1.5 text-[12px] text-muted italic">{deal.promoNote}</div>
+                ) : null}
+
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3 text-[13px]">
+                  <div>
                     <div className="text-paper">{deal.personName}</div>
-                    {deal.teamName ? (
-                      <div className="text-[12px] text-muted">{deal.teamName}</div>
+                    {deal.teamName ? <div className="text-[12px] text-muted">{deal.teamName}</div> : null}
+                  </div>
+                  <DealStatusCell deal={deal} />
+                </div>
+
+                {showMoney ? (
+                  <div className="mt-2 text-[13px]">
+                    <span className="num text-volt">{fmtMoney(deal.spiffAmount, true)}</span>
+                    {deal.partnerComp > 0 ? (
+                      <span className="num ml-1.5 text-[12px] text-muted">
+                        +{fmtMoney(deal.partnerComp, true)} partner
+                      </span>
                     ) : null}
-                  </Td>
-                  <Td>
-                    <DealStatusCell deal={deal} />
-                  </Td>
-                  {showMoney ? (
-                    <Td align="right">
-                      <span className="num text-paper">{fmtMoney(deal.spiffAmount, true)}</span>
-                      {deal.partnerComp > 0 ? (
-                        <div className="num text-[12px] text-muted">
-                          +{fmtMoney(deal.partnerComp, true)} partner
-                        </div>
+                  </div>
+                ) : null}
+
+                {canWrite ? (
+                  <div className="mt-3 flex justify-end border-t border-line pt-3">
+                    <DealActions deal={deal} canWrite={canWrite} />
+                  </div>
+                ) : null}
+              </Card>
+            ))}
+          </div>
+
+          <Card className="hidden overflow-x-auto p-0 sm:block">
+            <table className="w-full min-w-[860px] border-collapse">
+              <thead>
+                <tr>
+                  <Th>Client</Th>
+                  <Th>Rep</Th>
+                  <Th>Status</Th>
+                  {showMoney ? <Th align="right">Spiff</Th> : null}
+                  <Th align="right">Age</Th>
+                  {canWrite ? <Th align="right">Actions</Th> : null}
+                </tr>
+              </thead>
+              <tbody>
+                {page.rows.map((deal) => (
+                  <tr key={deal.id} className="align-top hover:bg-white/[0.025]">
+                    <Td>
+                      <div className="text-paper">{deal.clientName}</div>
+                      <div className="text-[12px] text-muted">
+                        {[deal.service, [deal.city, deal.state].filter(Boolean).join(', ')]
+                          .filter(Boolean)
+                          .join(' · ') || '—'}
+                      </div>
+                      {deal.promoNote ? (
+                        <div className="mt-1 text-[12px] text-muted italic">{deal.promoNote}</div>
                       ) : null}
                     </Td>
-                  ) : null}
-                  <Td align="right">
-                    <span className="num text-muted">{deal.ageDays}d</span>
-                  </Td>
-                  {canWrite ? (
-                    <Td align="right">
-                      <DealActions deal={deal} canWrite={canWrite} />
+                    <Td>
+                      <div className="text-paper">{deal.personName}</div>
+                      {deal.teamName ? (
+                        <div className="text-[12px] text-muted">{deal.teamName}</div>
+                      ) : null}
                     </Td>
-                  ) : null}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+                    <Td>
+                      <DealStatusCell deal={deal} />
+                    </Td>
+                    {showMoney ? (
+                      <Td align="right">
+                        <span className="num text-paper">{fmtMoney(deal.spiffAmount, true)}</span>
+                        {deal.partnerComp > 0 ? (
+                          <div className="num text-[12px] text-muted">
+                            +{fmtMoney(deal.partnerComp, true)} partner
+                          </div>
+                        ) : null}
+                      </Td>
+                    ) : null}
+                    <Td align="right">
+                      <span className="num text-muted">{deal.ageDays}d</span>
+                    </Td>
+                    {canWrite ? (
+                      <Td align="right">
+                        <DealActions deal={deal} canWrite={canWrite} />
+                      </Td>
+                    ) : null}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        </>
       )}
 
       <Pagination

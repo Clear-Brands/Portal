@@ -6,6 +6,15 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Skeletons — see src/components/skeletons.tsx for the per-page compositions  */
+/* -------------------------------------------------------------------------- */
+
+/** One pulsing bar. Every loading.tsx in the app is built from this. */
+export function Skeleton({ className }: { className?: string }) {
+  return <div aria-hidden className={cn('animate-pulse rounded-[6px] bg-white/[0.06]', className)} />
+}
+
+/* -------------------------------------------------------------------------- */
 /* Surfaces                                                                    */
 /* -------------------------------------------------------------------------- */
 
@@ -238,4 +247,35 @@ export function fmtMoney(value: number | string | null | undefined, exact = fals
 export function fmtCount(value: number | string | null | undefined) {
   const n = typeof value === 'string' ? Number(value) : (value ?? 0)
   return new Intl.NumberFormat('en-US').format(Number.isFinite(n) ? n : 0)
+}
+
+/**
+ * One short-date format across the app: "Jan 5".
+ *
+ * A plain `date` column (paid_date, a deal's created-at date, a competition's
+ * start/end) comes back as "YYYY-MM-DD" with no time component. `new
+ * Date("2026-01-05")` parses that as UTC midnight, so formatting it in a
+ * timezone west of UTC prints the day before — the exact class of bug ground
+ * rule 6 exists to prevent. Appending a local midnight time avoids it. A full
+ * timestamp (already has a time component) passes through unchanged.
+ */
+export function fmtDate(value: string | null | undefined) {
+  if (!value) return '—'
+  const iso = value.length === 10 ? `${value}T00:00:00` : value
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(d)
+}
+
+/** Same as fmtDate, plus the time — for timestamps where the time matters. */
+export function fmtDateTime(value: string | null | undefined) {
+  if (!value) return '—'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return '—'
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(d)
 }

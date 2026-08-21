@@ -1,9 +1,11 @@
+import Link from 'next/link'
+
 import { can } from '@/lib/auth/capabilities'
 import { requireSession } from '@/lib/session'
 import { getActivePartner } from '@/lib/partner-context'
 import { listActivity } from '@/lib/data/activity'
-import { parseActivityFilters, toActivitySearchParams } from '@/lib/activity/filters'
-import { Card, Eyebrow, Pill, fmtCount } from '@/components/ui'
+import { DEFAULT_ACTIVITY_FILTERS, parseActivityFilters, toActivitySearchParams } from '@/lib/activity/filters'
+import { Card, Eyebrow, Pill, fmtCount, fmtDateTime } from '@/components/ui'
 import { Pagination } from '@/components/pagination'
 import { ActivityFilterBar } from './activity-filter-bar'
 import type { ActivityKind } from '@/lib/data/activity'
@@ -62,7 +64,19 @@ export default async function ActivityPage({
 
       {page.rows.length === 0 ? (
         <Card>
-          <p className="text-[14px] text-muted">Nothing matches this filter.</p>
+          <p className="text-[14px] text-muted">
+            {filters.q === DEFAULT_ACTIVITY_FILTERS.q && filters.kind === DEFAULT_ACTIVITY_FILTERS.kind ? (
+              'Nothing logged yet. This fills up as deals, payouts and roster changes happen.'
+            ) : (
+              <>
+                Nothing matches this filter.{' '}
+                <Link href="/activity" className="text-volt underline underline-offset-4">
+                  Clear it
+                </Link>
+                {' '}to see everything.
+              </>
+            )}
+          </p>
         </Card>
       ) : (
         <div className="grid gap-1.5">
@@ -75,12 +89,7 @@ export default async function ActivityPage({
               <span className="flex-1 text-paper">{entry.text}</span>
               <span className="text-[12px] text-muted">{entry.actorName}</span>
               <time dateTime={entry.createdAt} className="num w-[128px] text-right text-[12px] text-muted">
-                {new Date(entry.createdAt).toLocaleString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  hour: 'numeric',
-                  minute: '2-digit',
-                })}
+                {fmtDateTime(entry.createdAt)}
               </time>
             </div>
           ))}

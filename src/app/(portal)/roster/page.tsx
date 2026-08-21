@@ -80,82 +80,148 @@ export default async function RosterPage({
           </p>
         </Card>
       ) : (
-        <Card className="overflow-x-auto p-0">
-          <table className="w-full min-w-[860px] border-collapse">
-            <thead>
-              <tr>
-                <Th>Name</Th>
-                <Th>Pod</Th>
-                <Th align="right">Sent</Th>
-                <Th align="right">Closes</Th>
-                {showMoney ? <Th align="right">Spiff</Th> : null}
-                <Th>Status</Th>
-                {canWrite ? <Th align="right">Actions</Th> : null}
-              </tr>
-            </thead>
-            <tbody>
-              {page.rows.map((person) => (
-                <tr key={person.id} className="align-top hover:bg-white/[0.025]">
-                  <Td>
-                    <div className="text-paper">{person.name}</div>
-                    <div className="text-[12px] text-muted">{person.email}</div>
-                  </Td>
-                  <Td>
-                    {person.teamName ? (
-                      <span className="inline-flex items-center gap-1.5">
-                        <span
-                          aria-hidden
-                          className="h-[7px] w-[7px] rounded-full"
-                          style={{ backgroundColor: person.teamColor }}
-                        />
-                        {person.teamName}
-                      </span>
-                    ) : (
-                      <span className="text-muted">—</span>
-                    )}
-                    {person.kind === 'manager' ? (
-                      <div className="mt-1 text-[11.5px] text-muted uppercase">Manager</div>
-                    ) : null}
-                  </Td>
-                  <Td align="right">
+        <>
+          {/* Below sm, a table this wide is unreadable no matter how it scrolls — cards instead. */}
+          <div className="grid gap-2.5 sm:hidden">
+            {page.rows.map((person) => (
+              <Card key={person.id}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-paper">{person.name}</div>
+                    <div className="truncate text-[12px] text-muted">{person.email}</div>
+                  </div>
+                  <Pill tone={person.active ? 'neutral' : 'lost'}>
+                    {person.active ? 'Active' : 'Inactive'}
+                  </Pill>
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted">
+                  {person.teamName ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <span
+                        aria-hidden
+                        className="h-[7px] w-[7px] rounded-full"
+                        style={{ backgroundColor: person.teamColor }}
+                      />
+                      {person.teamName}
+                      {person.kind === 'manager' ? ' · Manager' : ''}
+                    </span>
+                  ) : (
+                    <span>No pod{person.kind === 'manager' ? ' · Manager' : ''}</span>
+                  )}
+                </div>
+
+                <div className="mt-3 grid grid-cols-3 gap-2 border-t border-line pt-3 text-[13px]">
+                  <div>
+                    <div className="text-[11px] text-muted uppercase">Sent</div>
                     <span className="num text-paper">{fmtCount(person.dealsSent)}</span>
-                  </Td>
-                  <Td align="right">
+                  </div>
+                  <div>
+                    <div className="text-[11px] text-muted uppercase">Closes</div>
                     <span className="num text-paper">{fmtCount(person.closes)}</span>
                     {person.openDeals > 0 ? (
-                      <div className="num text-[12px] text-muted">{person.openDeals} open</div>
+                      <div className="num text-[11px] text-muted">{person.openDeals} open</div>
                     ) : null}
-                  </Td>
+                  </div>
                   {showMoney ? (
-                    <Td align="right">
+                    <div>
+                      <div className="text-[11px] text-muted uppercase">Spiff</div>
                       <span className="num text-volt">{fmtMoney(person.spiffPayable, true)}</span>
-                      {person.spiffEarned !== person.spiffPayable ? (
-                        <div className="num text-[12px] text-muted">
-                          {fmtMoney(person.spiffEarned, true)} earned
-                        </div>
+                    </div>
+                  ) : null}
+                </div>
+
+                {canWrite ? (
+                  <div className="mt-3 flex justify-end border-t border-line pt-3">
+                    <PersonRowActions
+                      person={person}
+                      teams={podCounts.teams}
+                      canWrite={canWrite}
+                      canManagePerms={canManagePerms}
+                    />
+                  </div>
+                ) : null}
+              </Card>
+            ))}
+          </div>
+
+          <Card className="hidden overflow-x-auto p-0 sm:block">
+            <table className="w-full min-w-[860px] border-collapse">
+              <thead>
+                <tr>
+                  <Th>Name</Th>
+                  <Th>Pod</Th>
+                  <Th align="right">Sent</Th>
+                  <Th align="right">Closes</Th>
+                  {showMoney ? <Th align="right">Spiff</Th> : null}
+                  <Th>Status</Th>
+                  {canWrite ? <Th align="right">Actions</Th> : null}
+                </tr>
+              </thead>
+              <tbody>
+                {page.rows.map((person) => (
+                  <tr key={person.id} className="align-top hover:bg-white/[0.025]">
+                    <Td>
+                      <div className="text-paper">{person.name}</div>
+                      <div className="text-[12px] text-muted">{person.email}</div>
+                    </Td>
+                    <Td>
+                      {person.teamName ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span
+                            aria-hidden
+                            className="h-[7px] w-[7px] rounded-full"
+                            style={{ backgroundColor: person.teamColor }}
+                          />
+                          {person.teamName}
+                        </span>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                      {person.kind === 'manager' ? (
+                        <div className="mt-1 text-[11.5px] text-muted uppercase">Manager</div>
                       ) : null}
                     </Td>
-                  ) : null}
-                  <Td>
-                    <Pill tone={person.active ? 'neutral' : 'lost'}>
-                      {person.active ? 'Active' : 'Inactive'}
-                    </Pill>
-                  </Td>
-                  {canWrite ? (
                     <Td align="right">
-                      <PersonRowActions
-                        person={person}
-                        teams={podCounts.teams}
-                        canWrite={canWrite}
-                        canManagePerms={canManagePerms}
-                      />
+                      <span className="num text-paper">{fmtCount(person.dealsSent)}</span>
                     </Td>
-                  ) : null}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+                    <Td align="right">
+                      <span className="num text-paper">{fmtCount(person.closes)}</span>
+                      {person.openDeals > 0 ? (
+                        <div className="num text-[12px] text-muted">{person.openDeals} open</div>
+                      ) : null}
+                    </Td>
+                    {showMoney ? (
+                      <Td align="right">
+                        <span className="num text-volt">{fmtMoney(person.spiffPayable, true)}</span>
+                        {person.spiffEarned !== person.spiffPayable ? (
+                          <div className="num text-[12px] text-muted">
+                            {fmtMoney(person.spiffEarned, true)} earned
+                          </div>
+                        ) : null}
+                      </Td>
+                    ) : null}
+                    <Td>
+                      <Pill tone={person.active ? 'neutral' : 'lost'}>
+                        {person.active ? 'Active' : 'Inactive'}
+                      </Pill>
+                    </Td>
+                    {canWrite ? (
+                      <Td align="right">
+                        <PersonRowActions
+                          person={person}
+                          teams={podCounts.teams}
+                          canWrite={canWrite}
+                          canManagePerms={canManagePerms}
+                        />
+                      </Td>
+                    ) : null}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        </>
       )}
 
       <Pagination
