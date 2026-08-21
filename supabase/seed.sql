@@ -192,6 +192,17 @@ select pg_temp.sid('bl' || i),
        pg_temp.shift(('2026-07-0' || (1 + (i % 5)))::date)
 from generate_series(1, 24) i;
 
+-- Insert stamps updated_at with now(), which would make every seeded deal look
+-- like it moved a second ago and hide the "no movement in N days" warning.
+-- Backdate it to the creation date so the stale referral actually reads as stale.
+--
+-- Triggers are off for this one statement: touch_updated_at() would otherwise
+-- immediately stamp the value we are trying to set, and the activity log would
+-- gain 36 meaningless "corrected" entries.
+alter table deals disable trigger user;
+update deals set updated_at = created_at;
+alter table deals enable trigger user;
+
 -- The three deals that were settled in the most recent batch are marked live for
 -- rev share; the rest default to null (not yet live).
 update deals set live = true

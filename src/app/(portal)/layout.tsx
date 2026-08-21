@@ -92,7 +92,7 @@ export default async function PortalLayout({ children }: { children: React.React
             {items.map((item) => (
               <li key={item.href} className="flex-none lg:flex-auto">
                 <Link
-                  href={item.href as never}
+                  href={item.href}
                   className={cn(
                     'block rounded-[7px] px-3 py-2 text-[13.5px] whitespace-nowrap text-muted',
                     'hover:bg-white/5 hover:text-paper',

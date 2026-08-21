@@ -1,7 +1,6 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import type { Route } from 'next'
 import { z } from 'zod'
 
 import { createClient } from '@/lib/supabase/server'
@@ -55,12 +54,11 @@ export async function signInWithPassword(
     return { error: 'That email and password do not match. Try again, or use a sign-in link.' }
   }
 
-  // Only ever redirect to a path on this origin. `as Route` is needed because
-  // typedRoutes cannot know a runtime string is a real route; the startsWith
-  // guard is what actually keeps this from becoming an open redirect.
+  // Only ever redirect to a path on this origin — the startsWith guard is what
+  // keeps this from becoming an open redirect.
   const next = parsed.data.next
   const destination = next && next.startsWith('/') && !next.startsWith('//') ? next : '/'
-  redirect(destination as Route)
+  redirect(destination)
 }
 
 export async function sendSignInLink(

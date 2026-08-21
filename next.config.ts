@@ -16,9 +16,10 @@ const securityHeaders = [
 ]
 
 const nextConfig: NextConfig = {
+  // typedRoutes is off: nearly every link here is built from filter state at
+  // runtime, so it produced casts at each call site without catching anything.
   reactStrictMode: true,
   poweredByHeader: false,
-  typedRoutes: true,
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }]
   },
