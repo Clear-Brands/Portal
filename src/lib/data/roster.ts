@@ -5,6 +5,7 @@ import { getActivePartner } from '@/lib/partner-context'
 import { listTeamOptions } from '@/lib/data/deals'
 import type { Page, TeamOption } from '@/lib/types'
 import type { RosterFilters } from '@/lib/roster/filters'
+import type { Access, Role } from '@/lib/auth/capabilities'
 
 /**
  * Roster reads.
@@ -38,9 +39,12 @@ export interface RosterRow {
   spiffPayable: number
   openDeals: number
   hasLogin: boolean
+  /** Non-null exactly when hasLogin is true — the permissions grid needs the
+   *  profile id and its current role/access/perms to render and to save. */
+  login: { profileId: string; role: Role; access: Access; perms: Record<string, boolean> } | null
 }
 
-function toRosterRow(row: Row): Omit<RosterRow, 'hasLogin'> {
+function toRosterRow(row: Row): Omit<RosterRow, 'hasLogin' | 'login'> {
   return {
     id: row.person_id as string,
     teamId: (row.team_id as string) ?? null,
@@ -99,11 +103,24 @@ export async function listRoster(filters: RosterFilters): Promise<Page<RosterRow
   const ids = partial.map((p) => p.id)
 
   const { data: logins } = ids.length
-    ? await supabase.from('profiles').select('person_id').in('person_id', ids)
-    : { data: [] as { person_id: string }[] }
-  const withLogin = new Set((logins ?? []).map((l) => l.person_id as string))
+    ? await supabase.from('profiles').select('id, person_id, role, access, perms').in('person_id', ids)
+    : { data: [] as { id: string; person_id: string; role: string; access: string; perms: unknown }[] }
+  const loginByPerson = new Map(
+    (logins ?? []).map((l) => [
+      l.person_id as string,
+      {
+        profileId: l.id as string,
+        role: l.role as Role,
+        access: l.access as Access,
+        perms: (l.perms as Record<string, boolean>) ?? {},
+      },
+    ]),
+  )
 
-  const rows: RosterRow[] = partial.map((p) => ({ ...p, hasLogin: withLogin.has(p.id) }))
+  const rows: RosterRow[] = partial.map((p) => {
+    const login = loginByPerson.get(p.id) ?? null
+    return { ...p, hasLogin: login !== null, login }
+  })
   const total = count ?? 0
 
   return {
@@ -174,9 +191,20 @@ export async function getRosterPerson(id: string): Promise<RosterRow | null> {
 
   const { data: login } = await supabase
     .from('profiles')
-    .select('id')
+    .select('id, role, access, perms')
     .eq('person_id', id)
     .maybeSingle()
 
-  return { ...toRosterRow(data), hasLogin: Boolean(login) }
+  return {
+    ...toRosterRow(data),
+    hasLogin: Boolean(login),
+    login: login
+      ? {
+          profileId: login.id as string,
+          role: login.role as Role,
+          access: login.access as Access,
+          perms: (login.perms as Record<string, boolean>) ?? {},
+        }
+      : null,
+  }
 }

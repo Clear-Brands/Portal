@@ -26,10 +26,10 @@ export default [
   {
     // The three sanctioned callers of the service-role client: auth admin
     // (creating/inviting accounts), the outbox worker, and inbound webhooks.
-    // Each of these files does its own authorisation against the
-    // session-scoped client before it ever reaches the admin client — see the
-    // module comment in src/lib/actions/roster.ts.
-    files: ['src/lib/actions/roster.ts'],
+    // roster.ts and partners.ts are both the "auth admin" case — each does its
+    // own authorisation against the session-scoped client before it ever
+    // reaches the admin client, and only to create or invite an auth account.
+    files: ['src/lib/actions/roster.ts', 'src/lib/actions/partners.ts'],
     rules: {
       'no-restricted-imports': 'off',
     },

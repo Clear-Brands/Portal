@@ -29,6 +29,8 @@ export default async function RosterPage({
 
   const canWrite = can(profile, 'people.write')
   const showMoney = can(profile, 'spiffs.view') && (partner?.spiffsEnabled ?? true)
+  const canManagePerms =
+    (profile.role === 'internal' && profile.access === 'admin') || profile.role === 'partner_admin'
 
   const pods: PodTab[] = [
     { value: '', label: 'All pods', color: null, count: podCounts.all },
@@ -145,6 +147,7 @@ export default async function RosterPage({
                         person={person}
                         teams={podCounts.teams}
                         canWrite={canWrite}
+                        canManagePerms={canManagePerms}
                       />
                     </Td>
                   ) : null}

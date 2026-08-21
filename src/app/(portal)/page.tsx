@@ -127,7 +127,7 @@ export default async function DashboardPage() {
         )}
       </section>
 
-      <Podiums />
+      {can(profile, 'podium.view') ? <Podiums /> : null}
     </>
   )
 }
@@ -205,7 +205,7 @@ async function MemberDashboard({
         </Card>
       </section>
 
-      <Podiums />
+      {can(profile, 'podium.view') ? <Podiums /> : null}
     </>
   )
 }

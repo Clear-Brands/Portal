@@ -458,4 +458,104 @@ end $$;
 reset role;
 update people set active = true where id = pg_temp.sid('r1');
 
+do $$ begin raise notice ''; raise notice 'PERMISSIONS — self-elevation is refused, an admin can still adjust a colleague'; end $$;
+
+-- Before 0014_partners_and_permissions.sql, profiles_write_internal was gated
+-- on has_cap('people.write') alone — which every internal manager holds by
+-- default, so a manager could rewrite their OWN profile's access straight to
+-- 'admin' and grant themselves everything. profiles_write_admin closes that:
+-- only an existing admin may write the profiles table at all.
+reset role;
+select pg_temp.become('jordan@clearbrands.io');   -- internal manager: people.write, access = 'manager'
+set role authenticated;
+
+do $$
+declare v_access text;
+begin
+  update profiles set access = 'admin'
+   where user_id = (select id from auth.users where email = 'jordan@clearbrands.io');
+
+  select access into v_access from profiles
+   where user_id = (select id from auth.users where email = 'jordan@clearbrands.io');
+
+  perform pg_temp.ok('a manager cannot elevate their own access via a direct profile write',
+    v_access = 'manager');
+end $$;
+
+reset role;
+select pg_temp.become('team@clearbrands.io');   -- internal admin
+set role authenticated;
+
+do $$
+declare v_after jsonb;
+begin
+  update profiles set perms = jsonb_set(coalesce(perms, '{}'::jsonb), array['revshare.write'], 'true'::jsonb)
+   where user_id = (select id from auth.users where email = 'jordan@clearbrands.io');
+
+  select perms into v_after from profiles
+   where user_id = (select id from auth.users where email = 'jordan@clearbrands.io');
+
+  perform pg_temp.ok('an admin can grant a colleague an extra capability',
+    coalesce((v_after ->> 'revshare.write')::boolean, false));
+end $$;
+
+reset role;
+select pg_temp.become('jordan@clearbrands.io');
+set role authenticated;
+
+do $$
+begin
+  perform pg_temp.ok('the grant actually takes effect for the colleague, not just the stored row',
+    public.has_cap('revshare.write'));
+end $$;
+
+reset role;
+select pg_temp.become('team@clearbrands.io');
+set role authenticated;
+
+-- Leave the seed data as this file found it.
+do $$
+begin
+  update profiles set perms = perms - 'revshare.write'
+   where user_id = (select id from auth.users where email = 'jordan@clearbrands.io');
+end $$;
+
+do $$ begin raise notice ''; raise notice 'PARTNERS — the last active partner cannot be archived'; end $$;
+
+do $$
+begin
+  perform public.archive_partner(pg_temp.sid('p_ac'));
+  perform public.archive_partner(pg_temp.sid('p_t1'));
+  perform public.archive_partner(pg_temp.sid('p_t2'));
+  perform public.archive_partner(pg_temp.sid('p_t3'));
+  perform public.archive_partner(pg_temp.sid('p_t4'));
+  perform pg_temp.ok('archiving down to one active partner succeeds',
+    (select count(*) from partners where archived_at is null) = 1);
+end $$;
+
+do $$
+declare v_failed boolean := false;
+begin
+  begin
+    perform public.archive_partner(pg_temp.sid('p_fp'));
+  exception when others then v_failed := true;
+  end;
+  perform pg_temp.ok('archiving the last active partner is refused', v_failed);
+  perform pg_temp.ok('the last partner is still active',
+    (select archived_at from partners where id = pg_temp.sid('p_fp')) is null);
+end $$;
+
+do $$
+begin
+  perform public.restore_partner(pg_temp.sid('p_ac'));
+  perform public.restore_partner(pg_temp.sid('p_t1'));
+  perform public.restore_partner(pg_temp.sid('p_t2'));
+  perform public.restore_partner(pg_temp.sid('p_t3'));
+  perform public.restore_partner(pg_temp.sid('p_t4'));
+  perform pg_temp.ok('restoring puts every partner back',
+    (select count(*) from partners where archived_at is null) = 6);
+end $$;
+
+reset role;
+
 do $$ begin raise notice ''; raise notice 'All RLS assertions passed.'; raise notice ''; end $$;

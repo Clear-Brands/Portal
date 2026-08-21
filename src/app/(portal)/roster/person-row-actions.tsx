@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from 'react'
 
 import { Button, Field, Pill, inputClass } from '@/components/ui'
 import { ConfirmDialog } from '@/components/dialog'
+import { PermissionGridButton } from '@/components/permission-grid'
 import { editPerson, enablePortalLogin, setPersonActive } from '@/lib/actions/roster'
 import type { ActionState } from '@/lib/actions/deals'
 import type { RosterRow } from '@/lib/data/roster'
@@ -24,10 +25,14 @@ export function PersonRowActions({
   person,
   teams,
   canWrite,
+  canManagePerms,
 }: {
   person: RosterRow
   teams: TeamOption[]
   canWrite: boolean
+  /** Only a Clear Brands admin or the person's own partner admin may grant or
+   *  revoke capabilities — an internal manager sees the roster but not this. */
+  canManagePerms: boolean
 }) {
   const [editState, editAction, editPending] = useActionState(editPerson, initial)
   const [activeState, activeAction, activePending] = useActionState(setPersonActive, initial)
@@ -73,6 +78,18 @@ export function PersonRowActions({
             {invitePending ? 'Sending…' : 'Send login invite'}
           </Button>
         </form>
+      ) : null}
+
+      {person.login && canManagePerms ? (
+        <PermissionGridButton
+          login={{
+            profileId: person.login.profileId,
+            name: person.name,
+            role: person.login.role,
+            access: person.login.access,
+            perms: person.login.perms,
+          }}
+        />
       ) : null}
 
       {person.hasLogin ? <Pill tone="neutral">Has login</Pill> : null}

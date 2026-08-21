@@ -90,8 +90,59 @@ export interface SessionProfile {
   active: boolean
 }
 
-function defaultKey(role: Role, access: Access): string {
+export function defaultKey(role: Role, access: Access): string {
   return role === 'internal' ? `internal:${access}` : role
+}
+
+/**
+ * Which capabilities can change anything for a given role — the table the
+ * permissions grid (Phase 04, `/partners`) renders from, so it can never offer
+ * a checkbox that no policy and no page ever consults.
+ *
+ * Built by reading every place a capability is actually checked, not by
+ * guessing from the vocabulary:
+ *
+ *   - `deals.write`, `programs.write`, `partners.write`, `rates.write`,
+ *     `payouts.write`, `revshare.write` gate policies written against
+ *     `my_role() = 'internal'` only (0008_rls.sql) — internal-only.
+ *   - `people.write` also gates the partner-admin people/profile policies
+ *     (`people_write_partner_admin` and siblings) — internal and partner_admin.
+ *   - `payouts.view`, `revshare.view`, `activity.view` gate policies that
+ *     explicitly branch on `partner_admin`; `revshare.view` and
+ *     `activity.view` do not extend to `member` the way `payouts.view` does.
+ *   - `exports.run`, `spiffs.view`, `competitions.view`, `podium.view` are
+ *     checked in the application layer (export routes, nav visibility, the
+ *     dashboard's podium and money columns) rather than in RLS, and apply to
+ *     whichever roles those surfaces actually render for.
+ */
+export const CAPABILITIES_APPLICABLE_TO: Record<Role, Capability[]> = {
+  internal: [
+    'deals.write',
+    'people.write',
+    'programs.write',
+    'partners.write',
+    'rates.write',
+    'payouts.write',
+    'payouts.view',
+    'revshare.write',
+    'revshare.view',
+    'activity.view',
+    'exports.run',
+    'spiffs.view',
+    'competitions.view',
+    'podium.view',
+  ],
+  partner_admin: [
+    'people.write',
+    'payouts.view',
+    'revshare.view',
+    'activity.view',
+    'exports.run',
+    'spiffs.view',
+    'competitions.view',
+    'podium.view',
+  ],
+  member: ['payouts.view', 'exports.run', 'spiffs.view', 'competitions.view', 'podium.view'],
 }
 
 /**
