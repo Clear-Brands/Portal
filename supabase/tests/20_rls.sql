@@ -364,6 +364,77 @@ begin
   perform pg_temp.ok('a Clear Brands admin (payouts.write) can approve a goal prize', v_goal_id is not null);
 end $$;
 
+do $$ begin raise notice ''; raise notice 'ROSTER — the CSV importer''s kind restriction is enforced here too, not only in the app'; end $$;
+
+reset role;
+select pg_temp.become('partners@fieldpulse.com');   -- partner admin
+set role authenticated;
+
+do $$
+declare v_id uuid; v_failed boolean := false;
+begin
+  insert into people (partner_id, name, email, kind)
+  values (public.my_partner_id(), 'CSV Import Rep', 'csvrep@fieldpulse.com', 'rep')
+  returning id into v_id;
+  perform pg_temp.ok('a partner admin can add a rep to their own roster', v_id is not null);
+
+  begin
+    insert into people (partner_id, name, email, kind)
+    values (public.my_partner_id(), 'CSV Import Manager', 'csvmgr@fieldpulse.com', 'manager');
+  exception when others then v_failed := true;
+  end;
+  perform pg_temp.ok('a partner admin cannot add a pod manager', v_failed);
+end $$;
+
+do $$ begin raise notice ''; raise notice 'REV SHARE — record_revshare and void_revshare, the same guarded-RPC pattern as payouts'; end $$;
+
+reset role;
+select pg_temp.become('jordan@clearbrands.io');   -- internal manager: deals.write, not revshare.write
+set role authenticated;
+
+do $$
+declare v_failed boolean := false;
+begin
+  begin
+    perform public.record_revshare(pg_temp.sid('p_fp'), '2026-09', 'ACH RS-2609',
+      array[pg_temp.sid('d1'), pg_temp.sid('d2'), pg_temp.sid('d4')]);
+  exception when others then v_failed := true;
+  end;
+  perform pg_temp.ok('a manager without revshare.write cannot record a statement', v_failed);
+end $$;
+
+reset role;
+select pg_temp.become('team@clearbrands.io');   -- internal admin: holds revshare.write
+set role authenticated;
+
+do $$
+declare
+  v_id      uuid;
+  v_total   numeric;
+  v_expect  numeric;
+  v_failed  boolean := false;
+begin
+  v_id := public.record_revshare(pg_temp.sid('p_fp'), '2026-09', 'ACH RS-2609',
+    array[pg_temp.sid('d1'), pg_temp.sid('d2'), pg_temp.sid('d4')]);
+  perform pg_temp.ok('record_revshare returns a new statement', v_id is not null);
+
+  select total into v_total from revshare_statements where id = v_id;
+  select public.money_round(sum(monthly_value) * 5 / 100.0) into v_expect
+    from deals where id in (pg_temp.sid('d1'), pg_temp.sid('d2'), pg_temp.sid('d4'));
+  perform pg_temp.ok('the new statement total matches 5% of the accounts'' base', v_total = v_expect);
+
+  begin
+    perform public.record_revshare(pg_temp.sid('p_fp'), '2026-09', 'ACH RS-2609-DUP',
+      array[pg_temp.sid('d1')]);
+  exception when others then v_failed := true;
+  end;
+  perform pg_temp.ok('a second statement for the same period is refused', v_failed);
+
+  perform public.void_revshare(v_id, 'Test correction');
+  perform pg_temp.ok('void_revshare voids it',
+    (select voided_at from revshare_statements where id = v_id) is not null);
+end $$;
+
 do $$ begin raise notice ''; raise notice 'DEACTIVATION — a paused member is refused, not merely hidden'; end $$;
 
 reset role;
