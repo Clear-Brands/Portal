@@ -60,8 +60,10 @@ export default async function PortalLayout({ children }: { children: React.React
     <div className="min-h-dvh">
       <header className="sticky top-0 z-40 border-b border-line bg-ink/85 backdrop-blur-[10px]">
         <div className="mx-auto flex max-w-[1200px] items-center gap-4 px-7 py-3.5 max-sm:px-4">
-          <Link href="/" className="font-head text-[15px] tracking-[0.02em] text-paper">
-            Clear Brands
+          <Link href="/" className="flex items-center gap-2.5">
+            {/* eslint-disable-next-line @next/next/no-img-element -- a fixed, tiny local asset; the Netlify image loader adds nothing here. */}
+            <img src="/logo-mark.png" alt="" width={28} height={28} className="h-7 w-7 rounded-full" />
+            <span className="font-head text-[15px] tracking-[0.02em] text-paper">Clear Brands</span>
           </Link>
           <span className="font-head text-[11px] tracking-[0.25em] text-muted uppercase max-sm:hidden">
             Partner Portal
