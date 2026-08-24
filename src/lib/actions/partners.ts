@@ -43,7 +43,13 @@ export async function switchActivePartner(formData: FormData) {
   if (!partnerId) return
 
   await setActivePartner(partnerId)
-  redirect('/roster')
+
+  // The header switcher sends the page it was clicked from so switching
+  // partners mid-task doesn't bounce you away from what you were looking at;
+  // callers that don't set it (the partner detail page's "View their roster")
+  // keep the original behaviour.
+  const redirectTo = String(formData.get('redirectTo') ?? '/roster')
+  redirect(redirectTo.startsWith('/') ? redirectTo : '/roster')
 }
 
 /* -------------------------------------------------------------------------- */
@@ -182,6 +188,62 @@ async function inviteAdminLoginInternal(
   }
 
   return {}
+}
+
+/* -------------------------------------------------------------------------- */
+/* Clear Brands team                                                           */
+/* -------------------------------------------------------------------------- */
+
+const AddInternal = z.object({
+  name: z.string().trim().min(1, 'A name is required').max(160),
+  email: z.email('Enter a valid email address'),
+  accessLevel: z.enum(['manager', 'admin']),
+  title: z.string().trim().max(120).optional().default(''),
+})
+
+/**
+ * Add a Clear Brands staff login — admin-only, same as everything else on
+ * /partners/team. There was no path to this before: 'internal' logins could
+ * only ever be created by hand in SQL. Title is display-only (0015); what a
+ * manager can actually do is still access + the permissions grid on this
+ * same page.
+ */
+export async function addInternalLogin(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const profile = await requireSession()
+  if (!(profile.role === 'internal' && profile.access === 'admin')) {
+    return { error: 'Adding a Clear Brands login needs admin access.' }
+  }
+
+  const parsed = AddInternal.safeParse(Object.fromEntries(formData))
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Check the form and try again.' }
+  }
+
+  const admin = createAdminClient()
+  const { data: created, error: inviteError } = await admin.auth.admin.inviteUserByEmail(parsed.data.email, {
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+  })
+
+  if (inviteError || !created.user) {
+    return { error: 'Could not send the invite. Check the email address and try again.' }
+  }
+
+  const { error: profileError } = await admin.from('profiles').insert({
+    user_id: created.user.id,
+    role: 'internal',
+    access: parsed.data.accessLevel,
+    title: parsed.data.title || null,
+    name: parsed.data.name,
+    email: parsed.data.email,
+  })
+
+  if (profileError) {
+    await admin.auth.admin.deleteUser(created.user.id)
+    return { error: friendly(profileError.message) }
+  }
+
+  revalidatePath('/partners/team')
+  return { ok: `Invite sent to ${parsed.data.email}.` }
 }
 
 /* -------------------------------------------------------------------------- */

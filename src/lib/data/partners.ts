@@ -39,6 +39,9 @@ export interface PartnerLogin {
   email: string
   perms: Record<string, boolean>
   personId: string | null
+  /** Free-text display title (0015) — e.g. "Director of Sales", "Accounting".
+   *  Cosmetic only; never consulted by can()/has_cap(). */
+  title: string | null
 }
 
 type Row = Record<string, unknown>
@@ -53,6 +56,7 @@ function toLogin(row: Row): PartnerLogin {
     email: row.email as string,
     perms: (row.perms as Record<string, boolean>) ?? {},
     personId: (row.person_id as string) ?? null,
+    title: (row.title as string) ?? null,
   }
 }
 
@@ -61,7 +65,7 @@ export async function listPartnerLogins(partnerId: string): Promise<PartnerLogin
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, user_id, role, access, name, email, perms, person_id')
+    .select('id, user_id, role, access, name, email, perms, person_id, title')
     .eq('partner_id', partnerId)
     .order('role')
     .order('name')
@@ -75,7 +79,7 @@ export async function listInternalLogins(): Promise<PartnerLogin[]> {
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, user_id, role, access, name, email, perms, person_id')
+    .select('id, user_id, role, access, name, email, perms, person_id, title')
     .eq('role', 'internal')
     .order('access')
     .order('name')

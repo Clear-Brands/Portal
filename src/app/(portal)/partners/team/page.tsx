@@ -4,6 +4,7 @@ import { requireSession } from '@/lib/session'
 import { listInternalLogins } from '@/lib/data/partners'
 import { Card, Eyebrow, Pill } from '@/components/ui'
 import { PermissionGridButton } from '@/components/permission-grid'
+import { AddMemberButton } from './add-member-button'
 
 export const metadata = { title: 'Clear Brands team' }
 
@@ -24,14 +25,17 @@ export default async function ClearBrandsTeamPage() {
 
   return (
     <>
-      <div className="mb-6">
-        <Eyebrow>Clear Brands</Eyebrow>
-        <h1 className="font-head text-[26px] leading-tight text-paper">Team & permissions</h1>
-        <p className="mt-1.5 max-w-[62ch] text-[13.5px] text-muted">
-          Admins hold every capability by construction and are not editable here. A manager's
-          checked boxes are what they hold beyond the defaults for "manager" — day-to-day work, no
-          money writes.
-        </p>
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <Eyebrow>Clear Brands</Eyebrow>
+          <h1 className="font-head text-[26px] leading-tight text-paper">Team & permissions</h1>
+          <p className="mt-1.5 max-w-[62ch] text-[13.5px] text-muted">
+            Admins hold every capability by construction and are not editable here. A manager's
+            checked boxes are what they hold beyond the defaults for "manager" — day-to-day work,
+            no money writes.
+          </p>
+        </div>
+        <AddMemberButton />
       </div>
 
       <div className="grid gap-2.5 sm:hidden">
@@ -40,7 +44,10 @@ export default async function ClearBrandsTeamPage() {
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="truncate text-paper">{login.name}</div>
-                <div className="truncate text-[12px] text-muted">{login.email}</div>
+                <div className="truncate text-[12px] text-muted">
+                  {login.title ? `${login.title} · ` : ''}
+                  {login.email}
+                </div>
               </div>
               <Pill tone={login.access === 'admin' ? 'closed' : 'neutral'}>
                 {ACCESS_LABEL[login.access]}
@@ -81,7 +88,10 @@ export default async function ClearBrandsTeamPage() {
               <tr key={login.id} className="align-top hover:bg-white/[0.025]">
                 <Td>
                   <div className="text-paper">{login.name}</div>
-                  <div className="text-[12px] text-muted">{login.email}</div>
+                  <div className="text-[12px] text-muted">
+                    {login.title ? `${login.title} · ` : ''}
+                    {login.email}
+                  </div>
                 </Td>
                 <Td>
                   <Pill tone={login.access === 'admin' ? 'closed' : 'neutral'}>

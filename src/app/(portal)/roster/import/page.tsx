@@ -20,9 +20,12 @@ export default async function RosterImportPage() {
         <Eyebrow>{partner?.name ?? 'Roster'}</Eyebrow>
         <h1 className="font-head text-[26px] leading-tight text-paper">Import roster</h1>
         <p className="mt-1.5 max-w-[62ch] text-[13.5px] text-muted">
-          A CSV with name and email columns — pod and kind are optional. Nothing writes to the
-          roster until you review the preview below and commit it. Re-uploading the same file is
-          safe: anyone already on the roster shows up as a duplicate and is skipped.
+          Everyone in this file is added to{' '}
+          <span className="text-paper">{partner?.name ?? 'the selected partner'}</span> — switch
+          partners with the picker in the header before importing if that&rsquo;s not the one you
+          mean. A CSV with name and email columns — pod and kind are optional. Nothing writes to
+          the roster until you review the preview below and commit it. Re-uploading the same file
+          is safe: anyone already on the roster shows up as a duplicate and is skipped.
         </p>
       </div>
 

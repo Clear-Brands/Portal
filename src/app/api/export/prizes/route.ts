@@ -8,7 +8,7 @@ const SOURCE_LABEL: Record<string, string> = {
   competition: 'Competition',
   sprint_team: 'Sprint (pod)',
   sprint_rep: 'Sprint (rep)',
-  annual_goal: 'Annual goal',
+  annual_goal: 'Closers Club',
 }
 
 /** The prize list, exactly as /programs/prizes shows it. */

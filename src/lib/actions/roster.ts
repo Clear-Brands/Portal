@@ -36,6 +36,7 @@ const EditPerson = z.object({
   name: z.string().trim().min(1, 'A name is required').max(160),
   email: z.email('Enter a valid email address'),
   teamId: z.string().trim().optional().default(''),
+  title: z.string().trim().max(120).optional().default(''),
 })
 
 export async function editPerson(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -56,6 +57,7 @@ export async function editPerson(_prev: ActionState, formData: FormData): Promis
       name: parsed.data.name,
       email: parsed.data.email,
       team_id: parsed.data.teamId || null,
+      title: parsed.data.title || null,
     })
     .eq('id', parsed.data.personId)
 

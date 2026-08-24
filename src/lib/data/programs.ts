@@ -267,8 +267,8 @@ export interface AnnualGoalStanding {
 export interface AnnualGoal {
   id: string
   partnerId: string
-  teamId: string | null
-  teamName: string | null
+  teamIds: string[]
+  teamNames: string[]
   target: number
   prize: string
   startDate: string
@@ -282,10 +282,10 @@ export async function listAnnualGoals(): Promise<AnnualGoal[]> {
 
   const supabase = await createClient()
 
-  const [{ data: headers }, { data: standingRows }] = await Promise.all([
+  const [{ data: headers }, { data: standingRows }, { data: teamRows }] = await Promise.all([
     supabase
       .from('annual_goals')
-      .select('id, partner_id, team_id, target, prize, start_date, end_date, teams(name)')
+      .select('id, partner_id, team_ids, target, prize, start_date, end_date')
       .eq('partner_id', partner.id)
       .order('start_date', { ascending: false }),
     supabase
@@ -293,7 +293,13 @@ export async function listAnnualGoals(): Promise<AnnualGoal[]> {
       .select('*')
       .eq('partner_id', partner.id)
       .order('closes', { ascending: false }),
+    // team_ids is a plain array, not a foreign key PostgREST can embed —
+    // resolve pod names in TypeScript instead, the same way createSprint's
+    // teamPrizes are keyed by id rather than joined.
+    supabase.from('teams').select('id, name').eq('partner_id', partner.id),
   ])
+
+  const teamNameById = new Map(((teamRows ?? []) as Row[]).map((t) => [t.id as string, t.name as string]))
 
   const byGoal = new Map<string, AnnualGoalStanding[]>()
   for (const row of (standingRows ?? []) as Row[]) {
@@ -314,13 +320,12 @@ export async function listAnnualGoals(): Promise<AnnualGoal[]> {
   }
 
   return ((headers ?? []) as Row[]).map((row) => {
-    const team = row.teams as { name?: string } | { name?: string }[] | null
-    const t = Array.isArray(team) ? team[0] : team
+    const teamIds = ((row.team_ids as string[]) ?? []).filter(Boolean)
     return {
       id: row.id as string,
       partnerId: row.partner_id as string,
-      teamId: (row.team_id as string) ?? null,
-      teamName: t?.name ?? null,
+      teamIds,
+      teamNames: teamIds.map((id) => teamNameById.get(id)).filter((n): n is string => Boolean(n)),
       target: num(row.target),
       prize: (row.prize as string) ?? '',
       startDate: row.start_date as string,
@@ -431,7 +436,7 @@ export async function listPrizeLines(): Promise<PrizeLine[]> {
       if (!s.achieved || !goal.prize) continue
       lines.push({
         source: 'annual_goal',
-        sourceName: `${goal.target}-close annual goal`,
+        sourceName: `${goal.target}-close Closers Club`,
         personId: s.personId,
         personName: s.personName,
         teamName: null,

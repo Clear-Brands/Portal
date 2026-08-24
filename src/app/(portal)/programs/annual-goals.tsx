@@ -9,7 +9,7 @@ export function AnnualGoalsSection({ goals, canApprove }: { goals: AnnualGoal[];
   return (
     <section className="mt-10">
       <div className="mb-3">
-        <SectionHeading>Annual goals</SectionHeading>
+        <SectionHeading>Closers Club</SectionHeading>
       </div>
 
       <div className="grid gap-4">
@@ -25,7 +25,8 @@ export function AnnualGoalsSection({ goals, canApprove }: { goals: AnnualGoal[];
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="font-head text-[11px] tracking-[0.15em] text-muted uppercase">
-                    {goal.teamName ?? 'Everyone'} · {fmtDate(goal.startDate)} &ndash; {fmtDate(goal.endDate)}
+                    {goal.teamNames.length > 0 ? goal.teamNames.join(', ') : 'Everyone'} ·{' '}
+                    {fmtDate(goal.startDate)} &ndash; {fmtDate(goal.endDate)}
                   </p>
                   <h3 className="mt-1 font-head text-[19px] leading-tight text-paper">
                     {fmtCount(goal.target)} closes &rarr; {goal.prize || 'prize not set'}

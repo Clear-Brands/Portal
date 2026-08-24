@@ -14,7 +14,7 @@ const FEATURES: { key: keyof Partner; name: string; label: string }[] = [
   { key: 'spiffsEnabled', name: 'spiffsEnabled', label: 'Spiffs' },
   { key: 'revshareEnabled', name: 'revshareEnabled', label: 'Rev share' },
   { key: 'competitionsEnabled', name: 'competitionsEnabled', label: 'Competitions & sprints' },
-  { key: 'annualEnabled', name: 'annualEnabled', label: 'Annual goals' },
+  { key: 'annualEnabled', name: 'annualEnabled', label: 'Closers Club' },
 ]
 
 export function PartnerSettingsForm({ partner }: { partner: Partner }) {

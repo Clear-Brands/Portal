@@ -3,6 +3,8 @@ import Link from 'next/link'
 import { signOut } from '@/app/login/actions'
 import { can, type Capability } from '@/lib/auth/capabilities'
 import { requireSession } from '@/lib/session'
+import { getActivePartner, listSwitchablePartners } from '@/lib/partner-context'
+import { PartnerSwitcher } from '@/components/partner-switcher'
 import { NavLinks } from './nav-links'
 
 /**
@@ -56,6 +58,11 @@ export default async function PortalLayout({ children }: { children: React.React
   const profile = await requireSession()
   const items = (NAV[profile.role] ?? []).filter((i) => !i.capability || can(profile, i.capability))
 
+  const [switchablePartners, activePartner] =
+    profile.role === 'internal'
+      ? await Promise.all([listSwitchablePartners(), getActivePartner()])
+      : [[], null]
+
   return (
     <div className="min-h-dvh">
       <header className="sticky top-0 z-40 border-b border-line bg-ink/85 backdrop-blur-[10px]">
@@ -70,6 +77,9 @@ export default async function PortalLayout({ children }: { children: React.React
           </span>
 
           <div className="ml-auto flex items-center gap-3">
+            {profile.role === 'internal' ? (
+              <PartnerSwitcher partners={switchablePartners} activePartnerId={activePartner?.id ?? null} />
+            ) : null}
             <span className="text-[12.5px] text-muted max-sm:hidden">
               {profile.name} · {ROLE_LABEL[profile.role]}
             </span>

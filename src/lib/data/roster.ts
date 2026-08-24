@@ -31,6 +31,9 @@ export interface RosterRow {
   name: string
   email: string
   kind: 'rep' | 'manager'
+  /** Free-text display title (0015) — e.g. "Director of Sales". Cosmetic
+   *  only; never consulted by can()/has_cap()/has_pod_cap(). */
+  title: string | null
   active: boolean
   dealsSent: number
   closes: number
@@ -53,6 +56,7 @@ function toRosterRow(row: Row): Omit<RosterRow, 'hasLogin' | 'login'> {
     name: row.name as string,
     email: row.email as string,
     kind: row.kind as 'rep' | 'manager',
+    title: (row.title as string) ?? null,
     active: Boolean(row.active),
     dealsSent: num(row.deals_sent),
     closes: num(row.closes),

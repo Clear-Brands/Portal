@@ -88,7 +88,10 @@ export default async function RosterPage({
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="truncate text-paper">{person.name}</div>
-                    <div className="truncate text-[12px] text-muted">{person.email}</div>
+                    <div className="truncate text-[12px] text-muted">
+                      {person.title ? `${person.title} · ` : ''}
+                      {person.email}
+                    </div>
                   </div>
                   <Pill tone={person.active ? 'neutral' : 'lost'}>
                     {person.active ? 'Active' : 'Inactive'}
@@ -163,7 +166,10 @@ export default async function RosterPage({
                   <tr key={person.id} className="align-top hover:bg-white/[0.025]">
                     <Td>
                       <div className="text-paper">{person.name}</div>
-                      <div className="text-[12px] text-muted">{person.email}</div>
+                      <div className="text-[12px] text-muted">
+                        {person.title ? `${person.title} · ` : ''}
+                        {person.email}
+                      </div>
                     </Td>
                     <Td>
                       {person.teamName ? (

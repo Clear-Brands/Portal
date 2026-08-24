@@ -18,7 +18,7 @@ const SOURCE_LABEL: Record<string, string> = {
   competition: 'Competition',
   sprint_team: 'Sprint · pod',
   sprint_rep: 'Sprint · rep',
-  annual_goal: 'Annual goal',
+  annual_goal: 'Closers Club',
 }
 
 export default async function PrizesPage() {
@@ -38,7 +38,7 @@ export default async function PrizesPage() {
           <Eyebrow>{partner?.name ?? 'Programs'}</Eyebrow>
           <h1 className="font-head text-[26px] leading-tight text-paper">Prizes</h1>
           <p className="mt-1.5 max-w-[62ch] text-[13.5px] text-muted">
-            Who is owed what, across every competition, sprint and annual goal.
+            Who is owed what, across every competition, sprint and Closers Club.
           </p>
         </div>
         {canExport && sorted.length > 0 ? (

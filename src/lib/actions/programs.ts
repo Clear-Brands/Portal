@@ -170,6 +170,65 @@ export async function createSprint(_prev: ActionState, formData: FormData): Prom
 }
 
 /* -------------------------------------------------------------------------- */
+/* Closers Club (annual_goals) — hit a close count in a window, win the prize. */
+/*                                                                              */
+/* There was no create path for this before: the table and its standings view */
+/* already existed, but nothing in the UI could insert a row — Cristian's      */
+/* exact complaint on the Loom walkthrough ("I don't see anything in here to   */
+/* make anyone"). team_ids (0015) lets one competition span several pods, the  */
+/* way sprints already do; the exclusion constraint 0015 adds on annual_goals  */
+/* is what actually enforces "only one running at a time" for the partner —   */
+/* this action just turns that constraint violation into a readable error.    */
+/* -------------------------------------------------------------------------- */
+
+const AnnualGoalSchema = z
+  .object({
+    teamIds: z.array(z.uuid()).optional().default([]),
+    startDate: z.iso.date('Enter a valid start date'),
+    endDate: z.iso.date('Enter a valid end date'),
+    target: z.coerce.number().int('Whole closes only').min(1, 'At least one close is required'),
+    prize: z.string().trim().max(160).optional().default(''),
+  })
+  .refine((d) => d.endDate >= d.startDate, {
+    message: 'The end date must be on or after the start date',
+    path: ['endDate'],
+  })
+
+export async function createAnnualGoal(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const profile = await requireSession()
+  if (!can(profile, 'programs.write')) {
+    return { error: 'Starting a Closers Club competition needs programme permissions.' }
+  }
+
+  const partner = await getActivePartner()
+  if (!partner) return { error: 'No partner program is selected.' }
+
+  const teamIds = formData.getAll('teamIds').map(String)
+  const parsed = AnnualGoalSchema.safeParse({ ...Object.fromEntries(formData), teamIds })
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Check the form and try again.' }
+  }
+
+  const input = parsed.data
+  const supabase = await createClient()
+
+  const { error } = await supabase.from('annual_goals').insert({
+    partner_id: partner.id,
+    team_ids: input.teamIds,
+    start_date: input.startDate,
+    end_date: input.endDate,
+    target: input.target,
+    prize: input.prize,
+    created_by: profile.id,
+  })
+
+  if (error) return { error: friendly(error.message) }
+
+  revalidatePath('/programs')
+  return { ok: 'Closers Club competition started.' }
+}
+
+/* -------------------------------------------------------------------------- */
 /* Approving an annual goal prize — the one write here that commits money.     */
 /* -------------------------------------------------------------------------- */
 
@@ -214,11 +273,18 @@ export async function approveGoalAward(_prev: ActionState, formData: FormData): 
 /* -------------------------------------------------------------------------- */
 
 function friendly(message: string): string {
-  if (message.includes('competitions_window') || message.includes('sprints_window')) {
+  if (
+    message.includes('competitions_window') ||
+    message.includes('sprints_window') ||
+    message.includes('annual_goals_window')
+  ) {
     return 'The end date must be on or after the start date.'
   }
   if (message.includes('sprints_need_two_teams')) {
     return 'A sprint needs at least two pods.'
+  }
+  if (message.includes('annual_goals_one_active_per_partner')) {
+    return 'Only one Closers Club competition can run at a time for this partner — its dates overlap one that is already running.'
   }
   if (message.includes('violates row-level security') || message.includes('42501')) {
     return 'You do not have permission to do that.'

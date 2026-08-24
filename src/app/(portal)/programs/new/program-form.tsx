@@ -4,14 +4,14 @@ import { useActionState, useMemo, useState } from 'react'
 import Link from 'next/link'
 
 import { Button, Field, Notice, cn, inputClass } from '@/components/ui'
-import { createCompetition, createSprint } from '@/lib/actions/programs'
+import { createAnnualGoal, createCompetition, createSprint } from '@/lib/actions/programs'
 import type { ActionState } from '@/lib/actions/deals'
 import type { TeamOption } from '@/lib/types'
 
 const initial: ActionState = {}
 
 export function ProgramForm({ teams }: { teams: TeamOption[] }) {
-  const [kind, setKind] = useState<'competition' | 'sprint'>('competition')
+  const [kind, setKind] = useState<'competition' | 'sprint' | 'closers_club'>('competition')
 
   return (
     <div>
@@ -22,9 +22,18 @@ export function ProgramForm({ teams }: { teams: TeamOption[] }) {
         <TabButton active={kind === 'sprint'} onClick={() => setKind('sprint')}>
           Sprint
         </TabButton>
+        <TabButton active={kind === 'closers_club'} onClick={() => setKind('closers_club')}>
+          Closers Club
+        </TabButton>
       </div>
 
-      {kind === 'competition' ? <CompetitionForm teams={teams} /> : <SprintForm teams={teams} />}
+      {kind === 'competition' ? (
+        <CompetitionForm teams={teams} />
+      ) : kind === 'sprint' ? (
+        <SprintForm teams={teams} />
+      ) : (
+        <ClosersClubForm teams={teams} />
+      )}
     </div>
   )
 }
@@ -68,7 +77,7 @@ function CompetitionForm({ teams }: { teams: TeamOption[] }) {
         <input className={inputClass} name="name" required maxLength={160} autoFocus />
       </Field>
 
-      <Field label="Pod" hint="Leave as Everyone to run it partner-wide">
+      <Field label="Pod" hint="Leave as Everyone to run it across every pod for this partner — not any other partner">
         <select className={inputClass} name="teamId" defaultValue="">
           <option value="">Everyone</option>
           {teams.map((t) => (
@@ -245,6 +254,70 @@ function SprintForm({ teams }: { teams: TeamOption[] }) {
       </label>
 
       <FormActions pending={pending} label="Add sprint" />
+    </form>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* Closers Club — hit a close count in a window, one running at a time         */
+/* -------------------------------------------------------------------------- */
+
+function ClosersClubForm({ teams }: { teams: TeamOption[] }) {
+  const [state, action, pending] = useActionState(createAnnualGoal, initial)
+  const [selectedTeamIds, setSelectedTeamIds] = useState<string[]>([])
+
+  function toggleTeam(id: string) {
+    setSelectedTeamIds((prev) => (prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]))
+  }
+
+  return (
+    <form action={action} className="grid gap-5">
+      {state.ok ? <Notice tone="success">{state.ok}</Notice> : null}
+      {state.error ? <Notice tone="error">{state.error}</Notice> : null}
+
+      <p className="text-[13px] text-muted">
+        Everybody feels included in the company — the same target and prize can span one pod or
+        several. Only one Closers Club competition can run at a time for this partner; starting
+        one while another&rsquo;s dates overlap will be refused.
+      </p>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Starts">
+          <input className={inputClass} name="startDate" type="date" required />
+        </Field>
+        <Field label="Ends">
+          <input className={inputClass} name="endDate" type="date" required />
+        </Field>
+      </div>
+
+      <Field label="Pods" hint="Leave all unchecked to run it across every pod">
+        <div className="grid gap-1.5 rounded-[8px] border border-line bg-surface-2 p-2.5">
+          {teams.map((t) => (
+            <label key={t.id} className="flex items-center gap-2.5 px-1.5 py-1 text-[13.5px] text-paper">
+              <input
+                type="checkbox"
+                name="teamIds"
+                value={t.id}
+                checked={selectedTeamIds.includes(t.id)}
+                onChange={() => toggleTeam(t.id)}
+                className="h-4 w-4"
+              />
+              <span aria-hidden className="h-2 w-2 flex-none rounded-[2px]" style={{ background: t.color }} />
+              {t.name}
+            </label>
+          ))}
+        </div>
+      </Field>
+
+      <Field label="Target closes" hint="How many closes wins the prize">
+        <input className={inputClass} name="target" type="number" min={1} step={1} required />
+      </Field>
+
+      <Field label="Prize" hint="Optional — cash, a watch, anything">
+        <input className={inputClass} name="prize" maxLength={160} placeholder="$500, a trip, a watch…" />
+      </Field>
+
+      <FormActions pending={pending} label="Start Closers Club" />
     </form>
   )
 }

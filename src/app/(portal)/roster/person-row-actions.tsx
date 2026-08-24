@@ -133,6 +133,9 @@ export function PersonRowActions({
               ))}
             </select>
           </Field>
+          <Field label="Title" hint="Optional — e.g. Director of Sales, Account Manager">
+            <input name="title" defaultValue={person.title ?? ''} maxLength={120} className={inputClass} />
+          </Field>
         </div>
       </ConfirmDialog>
 
