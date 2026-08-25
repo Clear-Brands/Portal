@@ -57,7 +57,7 @@ export interface Partner {
   timezone: string
   defaultSpiff: number
   revsharePct: number
-  compMode: 'none' | 'flat' | 'pct'
+  compMode: 'none' | 'flat' | 'pct' | 'ongoing_pct'
   compFlat: number
   compPct: number
   compBasis: 'first_month' | 'contract'
@@ -94,6 +94,14 @@ export interface PayableLine {
   spiffAmount: number
   partnerComp: number
   closedAt: string
+  /** True for a deal closed under 'ongoing_pct' comp — approving it opts the
+   *  deal into the rev-share programme (deals.live = true) instead of, or
+   *  alongside, a one-time company payout line (which is always 0 here). */
+  ongoingRevshare: boolean
+  monthlyValue: number
+  /** The partner's rate at read time — display only, exactly like every other
+   *  number on this line; record_revshare() computes the real total fresh. */
+  revsharePct: number
 }
 
 export interface Payout {
@@ -239,6 +247,9 @@ export function toPayableLine(row: Row): PayableLine {
     spiffAmount: num(row.spiff_amount),
     partnerComp: num(row.partner_comp),
     closedAt: row.closed_at as string,
+    ongoingRevshare: Boolean(row.ongoing_revshare),
+    monthlyValue: num(row.monthly_value),
+    revsharePct: num(row.revshare_pct),
   }
 }
 

@@ -9,7 +9,7 @@ import {
   revshareHeadline,
   type LiveAccount,
 } from '@/lib/data/revshare'
-import { Card, Eyebrow, Pill, SectionHeading, fmtCount, fmtMoney } from '@/components/ui'
+import { Button, Card, Eyebrow, Pill, SectionHeading, fmtCount, fmtMoney } from '@/components/ui'
 import {
   AddToProgrammeButton,
   MarkChurnedButton,
@@ -32,6 +32,7 @@ export default async function RevsharePage() {
 
   const canWrite = can(profile, 'deals.write')
   const canBill = can(profile, 'revshare.write')
+  const canExport = can(profile, 'exports.run')
   const candidates = canWrite ? await listRevshareCandidates() : []
 
   const total = accruingTotal(accounts)
@@ -141,9 +142,16 @@ export default async function RevsharePage() {
                     ) : null}
                   </div>
 
-                  {canBill && !s.voidedAt ? (
-                    <VoidRevshareButton statementId={s.id} reference={s.reference} total={s.total} />
-                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    {canExport ? (
+                      <Button variant="ghost" size="sm">
+                        <a href={`/api/export/revshare/${s.id}`}>Export</a>
+                      </Button>
+                    ) : null}
+                    {canBill && !s.voidedAt ? (
+                      <VoidRevshareButton statementId={s.id} reference={s.reference} total={s.total} />
+                    ) : null}
+                  </div>
                 </div>
 
                 {s.lines.length > 0 ? (

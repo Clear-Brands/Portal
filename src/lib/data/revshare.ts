@@ -189,6 +189,26 @@ export async function listRevshareStatements(limitMonths = 24): Promise<Statemen
   return statements.map((s) => ({ ...s, lines: byStatement.get(s.id) ?? [] }))
 }
 
+/** One statement, itemised — the shape a downloadable monthly statement needs.
+ *  Mirrors getPayout() in lib/data/payouts.ts: works for a voided statement
+ *  too, since voiding never unlinks its line items. */
+export async function getRevshareStatement(id: string): Promise<StatementWithLines | null> {
+  const supabase = await createClient()
+
+  const [{ data: header }, { data: lines }] = await Promise.all([
+    supabase.from('revshare_statements').select('*').eq('id', id).maybeSingle(),
+    supabase
+      .from('revshare_lines')
+      .select('*')
+      .eq('statement_id', id)
+      .order('share', { ascending: false }),
+  ])
+
+  if (!header) return null
+
+  return { ...toStatement(header), lines: (lines ?? []).map(toLine) }
+}
+
 /** Lifetime total and whether the current month already has a live statement. */
 export async function revshareHeadline(): Promise<{
   lifetimeTotal: number

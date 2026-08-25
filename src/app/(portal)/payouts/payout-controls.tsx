@@ -180,11 +180,17 @@ export function ApproveCompButton({
   clientName,
   spiffAmount,
   partnerComp,
+  ongoingRevshare,
+  monthlyValue,
+  revsharePct,
 }: {
   dealId: string
   clientName: string
   spiffAmount: number
   partnerComp: number
+  ongoingRevshare: boolean
+  monthlyValue: number
+  revsharePct: number
 }) {
   const [state, action, pending] = useActionState(approveDealComp, initial)
   const [open, setOpen] = useState(false)
@@ -203,7 +209,11 @@ export function ApproveCompButton({
         open={open}
         onClose={() => setOpen(false)}
         title={`Approve ${clientName}?`}
-        description="A one-time check before this can be paid — once approved, it moves into the payable batch above and can be swept into the next transfer."
+        description={
+          ongoingRevshare
+            ? "A one-time check before this starts accruing — once approved, it joins the ongoing rev-share programme and can be billed in the next monthly statement."
+            : 'A one-time check before this can be paid — once approved, it moves into the payable batch above and can be swept into the next transfer.'
+        }
         confirmLabel="Approve"
         pending={pending}
         error={state.error}
@@ -216,9 +226,16 @@ export function ApproveCompButton({
               <span className="num text-paper">{fmtMoney(spiffAmount, true)}</span> to the rep
             </p>
           ) : null}
-          <p className="mt-1 text-[13px] text-muted">
-            <span className="num text-paper">{fmtMoney(partnerComp, true)}</span> to the company
-          </p>
+          {ongoingRevshare ? (
+            <p className="mt-1 text-[13px] text-muted">
+              <span className="num text-paper">{fmtMoney(monthlyValue, true)}</span>/mo at{' '}
+              <span className="num text-paper">{revsharePct}%</span> — ongoing, to the company
+            </p>
+          ) : (
+            <p className="mt-1 text-[13px] text-muted">
+              <span className="num text-paper">{fmtMoney(partnerComp, true)}</span> to the company
+            </p>
+          )}
         </div>
       </ConfirmDialog>
     </>

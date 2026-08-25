@@ -255,12 +255,26 @@ export async function approveDealComp(_prev: ActionState, formData: FormData): P
   }
 
   const supabase = await createClient()
+
+  // Read before approving, only to phrase the confirmation — approve_deal_comp
+  // itself is the source of truth for what actually happens.
+  const { data: before } = await supabase
+    .from('deals')
+    .select('ongoing_revshare')
+    .eq('id', parsed.data.dealId)
+    .maybeSingle()
+
   const { error } = await supabase.rpc('approve_deal_comp', { p_deal_id: parsed.data.dealId })
 
   if (error) return { error: friendly(error.message) }
 
   revalidatePath('/payouts')
-  return { ok: 'Approved — it will be included in the next payout.' }
+  revalidatePath('/revshare')
+  return {
+    ok: before?.ongoing_revshare
+      ? 'Approved — now accruing on the Rev share page.'
+      : 'Approved — it will be included in the next payout.',
+  }
 }
 
 /* -------------------------------------------------------------------------- */

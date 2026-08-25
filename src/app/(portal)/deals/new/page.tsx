@@ -33,6 +33,7 @@ export default async function NewDealPage() {
           defaultSpiff={partner?.defaultSpiff ?? 250}
           canPrice={can(profile, 'rates.write')}
           showDealValue={partner?.compMode === 'pct'}
+          showMonthlyValue={partner?.compMode === 'ongoing_pct'}
         />
       </Card>
     </>

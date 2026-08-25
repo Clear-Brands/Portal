@@ -30,7 +30,14 @@ export function PartnerRatesForm({ partner }: { partner: Partner }) {
         />
       </Field>
 
-      <Field label="Rev-share %" hint="Applied to the accruing monthly base each statement.">
+      <Field
+        label="Rev-share %"
+        hint={
+          compMode === 'ongoing_pct'
+            ? "The rate below applies here too — this is what \"Percentage of ongoing rev share\" pays, once a deal is approved."
+            : 'Applied to the accruing monthly base each statement.'
+        }
+      >
         <input
           name="revsharePct"
           type="number"
@@ -53,8 +60,17 @@ export function PartnerRatesForm({ partner }: { partner: Partner }) {
           <option value="none">None</option>
           <option value="flat">Flat amount per close</option>
           <option value="pct">Percentage per close</option>
+          <option value="ongoing_pct">Percentage of ongoing rev share</option>
         </select>
       </Field>
+
+      {compMode === 'ongoing_pct' ? (
+        <p className="-mt-2 text-[12.5px] text-muted">
+          No one-time company payout for this mode. Once a deal closes, it holds for a one-time
+          approval on Payouts — same as flat-fee — and then joins the ongoing monthly rev-share
+          programme at the rate above, exactly like adding an account by hand on the Rev share page.
+        </p>
+      ) : null}
 
       {/*
         compFlat and compPct must both be present in every submission — the
@@ -99,7 +115,7 @@ export function PartnerRatesForm({ partner }: { partner: Partner }) {
         <input type="hidden" name="compPct" value={partner.compPct} />
       )}
 
-      {compMode !== 'none' ? (
+      {compMode === 'flat' || compMode === 'pct' ? (
         <Field label="Basis">
           <select name="compBasis" defaultValue={partner.compBasis} className={inputClass}>
             <option value="first_month">First month's value</option>

@@ -15,11 +15,13 @@ export function DealForm({
   defaultSpiff,
   canPrice,
   showDealValue,
+  showMonthlyValue,
 }: {
   people: PersonOption[]
   defaultSpiff: number
   canPrice: boolean
   showDealValue: boolean
+  showMonthlyValue: boolean
 }) {
   const [state, action, pending] = useActionState(addDeal, initial)
 
@@ -89,6 +91,14 @@ export function DealForm({
           {showDealValue ? (
             <Field label="Deal value" hint="Used to work out the partner's percentage cut">
               <input className={inputClass} name="dealValue" type="number" min={0} step="0.01" />
+            </Field>
+          ) : null}
+          {showMonthlyValue ? (
+            <Field
+              label="Monthly value"
+              hint="What this client pays per month — the base for the partner's ongoing rev-share cut"
+            >
+              <input className={inputClass} name="monthlyValue" type="number" min={0} step="0.01" />
             </Field>
           ) : null}
         </div>

@@ -152,7 +152,8 @@ export default async function PayoutsPage() {
           <div className="mb-3">
             <SectionHeading>Awaiting approval</SectionHeading>
             <p className="mt-1 text-[12.5px] text-muted">
-              Closed on a flat-fee rate — each needs a one-time approval before it can be paid.
+              Each needs a one-time approval before it can be paid — or, for ongoing rev share,
+              before it starts accruing.
             </p>
           </div>
 
@@ -169,7 +170,21 @@ export default async function PayoutsPage() {
                         · <span className="num">{fmtMoney(line.spiffAmount, true)}</span> rep
                       </>
                     ) : null}{' '}
-                    · <span className="num">{fmtMoney(line.partnerComp, true)}</span> company
+                    ·{' '}
+                    {line.ongoingRevshare ? (
+                      line.monthlyValue > 0 ? (
+                        <>
+                          <span className="num">{fmtMoney(line.monthlyValue, true)}</span>/mo ongoing at{' '}
+                          <span className="num">{line.revsharePct}%</span>
+                        </>
+                      ) : (
+                        <span className="text-danger">needs a monthly value — see Rev share</span>
+                      )
+                    ) : (
+                      <>
+                        <span className="num">{fmtMoney(line.partnerComp, true)}</span> company
+                      </>
+                    )}
                   </p>
                 </div>
                 {canPay ? (
@@ -178,6 +193,9 @@ export default async function PayoutsPage() {
                     clientName={line.clientName}
                     spiffAmount={line.spiffAmount}
                     partnerComp={line.partnerComp}
+                    ongoingRevshare={line.ongoingRevshare}
+                    monthlyValue={line.monthlyValue}
+                    revsharePct={line.revsharePct}
                   />
                 ) : null}
               </Card>

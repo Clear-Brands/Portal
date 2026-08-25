@@ -304,7 +304,7 @@ const UpdateRates = z.object({
   partnerId: z.uuid(),
   defaultSpiff: z.coerce.number().min(0),
   revsharePct: z.coerce.number().min(0).max(100),
-  compMode: z.enum(['none', 'flat', 'pct']),
+  compMode: z.enum(['none', 'flat', 'pct', 'ongoing_pct']),
   compFlat: z.coerce.number().min(0),
   compPct: z.coerce.number().min(0).max(100),
   compBasis: z.enum(['first_month', 'contract']),
