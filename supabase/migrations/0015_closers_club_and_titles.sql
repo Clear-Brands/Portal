@@ -40,6 +40,38 @@ update annual_goals
    set team_ids = case when team_id is not null then array[team_id] else '{}'::uuid[] end;
 
 drop index if exists annual_goals_one_per_scope;
+
+-- v_annual_goal_standings (0009_views.sql) still reads annual_goals.team_id —
+-- it has to be redefined against team_ids before the column drop below, or
+-- Postgres refuses the drop ("other objects depend on it").
+create or replace view v_annual_goal_standings as
+  select g.id        as goal_id,
+         g.partner_id,
+         g.target,
+         g.prize,
+         g.start_date,
+         g.end_date,
+         pe.id       as person_id,
+         pe.name     as person_name,
+         pe.team_id,
+         coalesce(agg.closes, 0)                       as closes,
+         (coalesce(agg.closes, 0) >= g.target)         as achieved,
+         greatest(g.target - coalesce(agg.closes, 0), 0) as remaining,
+         (ga.id is not null)                           as approved,
+         ga.approved_at
+  from annual_goals g
+  join people pe on pe.partner_id = g.partner_id
+                and pe.kind = 'rep'
+                and (array_length(g.team_ids, 1) is null or pe.team_id = any (g.team_ids))
+  left join lateral (
+    select count(*) as closes
+    from v_closes c
+    where c.person_id = pe.id
+      and c.closed_at between g.start_date and g.end_date
+  ) agg on true
+  left join goal_awards ga on ga.goal_id = g.id and ga.person_id = pe.id
+  where my_role() = 'internal' or g.partner_id = my_partner_id();
+
 alter table annual_goals drop column team_id;
 
 create index annual_goals_teams_idx on annual_goals using gin (team_ids);
@@ -97,37 +129,3 @@ create or replace view v_person_stats as
     from deals d where d.person_id = pe.id
   ) agg on true
   where my_role() = 'internal' or pe.partner_id = my_partner_id();
-
--- ---------------------------------------------------------------------------
--- v_annual_goal_standings: rebuilt for team_ids. create or replace so this
--- stays the same view identity (grants, dependents) from 0009_views.sql —
--- editing that file in place would break a from-scratch migration replay,
--- since team_ids does not exist until this migration runs.
--- ---------------------------------------------------------------------------
-create or replace view v_annual_goal_standings as
-  select g.id        as goal_id,
-         g.partner_id,
-         g.target,
-         g.prize,
-         g.start_date,
-         g.end_date,
-         pe.id       as person_id,
-         pe.name     as person_name,
-         pe.team_id,
-         coalesce(agg.closes, 0)                       as closes,
-         (coalesce(agg.closes, 0) >= g.target)         as achieved,
-         greatest(g.target - coalesce(agg.closes, 0), 0) as remaining,
-         (ga.id is not null)                           as approved,
-         ga.approved_at
-  from annual_goals g
-  join people pe on pe.partner_id = g.partner_id
-                and pe.kind = 'rep'
-                and (array_length(g.team_ids, 1) is null or pe.team_id = any (g.team_ids))
-  left join lateral (
-    select count(*) as closes
-    from v_closes c
-    where c.person_id = pe.id
-      and c.closed_at between g.start_date and g.end_date
-  ) agg on true
-  left join goal_awards ga on ga.goal_id = g.id and ga.person_id = pe.id
-  where my_role() = 'internal' or g.partner_id = my_partner_id();
