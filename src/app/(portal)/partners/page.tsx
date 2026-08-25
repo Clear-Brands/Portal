@@ -31,9 +31,6 @@ export default async function PartnersPage() {
         </div>
 
         <div className="flex gap-2">
-          <Button size="sm" variant="ghost">
-            <Link href="/partners/team">Clear Brands team</Link>
-          </Button>
           <Button size="sm">
             <Link href="/partners/new">Onboard a partner</Link>
           </Button>

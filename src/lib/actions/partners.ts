@@ -203,7 +203,7 @@ const AddInternal = z.object({
 
 /**
  * Add a Clear Brands staff login — admin-only, same as everything else on
- * /partners/team. There was no path to this before: 'internal' logins could
+ * /clear-brands-team. There was no path to this before: 'internal' logins could
  * only ever be created by hand in SQL. Title is display-only (0015); what a
  * manager can actually do is still access + the permissions grid on this
  * same page.
@@ -242,7 +242,7 @@ export async function addInternalLogin(_prev: ActionState, formData: FormData): 
     return { error: friendly(profileError.message) }
   }
 
-  revalidatePath('/partners/team')
+  revalidatePath('/clear-brands-team')
   return { ok: `Invite sent to ${parsed.data.email}.` }
 }
 

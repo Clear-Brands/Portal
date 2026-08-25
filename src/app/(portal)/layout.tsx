@@ -1,7 +1,7 @@
 import Link from 'next/link'
 
 import { signOut } from '@/app/login/actions'
-import { can, type Capability } from '@/lib/auth/capabilities'
+import { can, isInternalAdmin, type Capability } from '@/lib/auth/capabilities'
 import { requireSession } from '@/lib/session'
 import { getActivePartner, listSwitchablePartners } from '@/lib/partner-context'
 import { PartnerSwitcher } from '@/components/partner-switcher'
@@ -57,6 +57,17 @@ const ROLE_LABEL: Record<string, string> = {
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const profile = await requireSession()
   const items = (NAV[profile.role] ?? []).filter((i) => !i.capability || can(profile, i.capability))
+
+  // Admin-only and gated on access level rather than a capability, so it can't
+  // just live in NAV's static, capability-filtered table above — same "who
+  // decides who holds what" reasoning as the page itself (see
+  // /clear-brands-team). Previously reachable only via a link buried under
+  // Partners; Cristian's ask was to surface it in the main nav instead.
+  if (isInternalAdmin(profile)) {
+    const partnersIdx = items.findIndex((i) => i.href === '/partners')
+    const teamItem = { href: '/clear-brands-team', label: 'Clear Brands team' }
+    items.splice(partnersIdx >= 0 ? partnersIdx + 1 : items.length, 0, teamItem)
+  }
 
   const [switchablePartners, activePartner] =
     profile.role === 'internal'
