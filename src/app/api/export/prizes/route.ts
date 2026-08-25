@@ -8,6 +8,7 @@ const SOURCE_LABEL: Record<string, string> = {
   competition: 'Competition',
   sprint_team: 'Sprint (pod)',
   sprint_rep: 'Sprint (rep)',
+  sprint_manager: 'Sprint (manager)',
   annual_goal: 'Closers Club',
 }
 

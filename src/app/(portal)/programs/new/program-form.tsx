@@ -226,21 +226,25 @@ function SprintForm({ teams }: { teams: TeamOption[] }) {
           ) : null}
           {selectedTeams.map((t) => (
             <div key={t.id} className="rounded-[8px] border border-line bg-surface-2 p-3.5">
-              <p className="mb-2.5 flex items-center gap-2 font-head text-[12px] tracking-[0.1em] text-paper uppercase">
+              <p className="mb-1 flex items-center gap-2 font-head text-[12px] tracking-[0.1em] text-paper uppercase">
                 <span aria-hidden className="h-2 w-2 rounded-[2px]" style={{ background: t.color }} />
                 {t.name}
               </p>
+              <p className="mb-2.5 text-[12px] text-muted">
+                This pod&rsquo;s own top rep, ranked against only this pod&rsquo;s reps — not the
+                other pods in the sprint.
+              </p>
               <div className="grid gap-3 sm:grid-cols-4">
-                <Field label="1st">
+                <Field label="1st rep">
                   <input className={inputClass} name={`teamPrize.${t.id}.c1`} maxLength={160} />
                 </Field>
-                <Field label="2nd">
+                <Field label="2nd rep" hint="Optional">
                   <input className={inputClass} name={`teamPrize.${t.id}.c2`} maxLength={160} />
                 </Field>
-                <Field label="3rd">
+                <Field label="3rd rep" hint="Optional">
                   <input className={inputClass} name={`teamPrize.${t.id}.c3`} maxLength={160} />
                 </Field>
-                <Field label="Manager">
+                <Field label="Pod's manager" hint="Optional">
                   <input className={inputClass} name={`teamPrize.${t.id}.mgr`} maxLength={160} />
                 </Field>
               </div>

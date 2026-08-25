@@ -149,6 +149,11 @@ export interface TeamPrize {
   mgr: string
 }
 
+export interface TeamManager {
+  personId: string
+  personName: string
+}
+
 export interface Sprint {
   id: string
   partnerId: string
@@ -168,6 +173,12 @@ export interface Sprint {
   visible: boolean
   teamStandings: SprintTeamStanding[]
   overall: SprintOverallStanding[]
+  /** 'perteam' only — each pod's own top 3 reps, ranked within that pod alone
+   *  (v_sprint_team_reps), not against the other pods racing in the sprint. */
+  teamReps: Record<string, SprintOverallStanding[]>
+  /** Every pod's manager(s) — teams.manager_ids resolved to a name, so
+   *  `team_prizes[teamId].mgr` has someone to attach itself to. */
+  teamManagers: Record<string, TeamManager[]>
 }
 
 export async function listSprints(): Promise<Sprint[]> {
@@ -176,23 +187,51 @@ export async function listSprints(): Promise<Sprint[]> {
 
   const supabase = await createClient()
 
-  const [{ data: headers }, { data: teamRows }, { data: overallRows }] = await Promise.all([
-    supabase
-      .from('sprints')
-      .select('*')
-      .eq('partner_id', partner.id)
-      .order('start_date', { ascending: false }),
-    supabase
-      .from('v_sprint_team_standings')
-      .select('*')
-      .eq('partner_id', partner.id)
-      .order('position'),
-    supabase
-      .from('v_sprint_overall')
-      .select('*')
-      .eq('partner_id', partner.id)
-      .order('position'),
-  ])
+  const [{ data: headers }, { data: teamRows }, { data: overallRows }, { data: teamRepRows }, { data: podRows }] =
+    await Promise.all([
+      supabase
+        .from('sprints')
+        .select('*')
+        .eq('partner_id', partner.id)
+        .order('start_date', { ascending: false }),
+      supabase
+        .from('v_sprint_team_standings')
+        .select('*')
+        .eq('partner_id', partner.id)
+        .order('position'),
+      supabase
+        .from('v_sprint_overall')
+        .select('*')
+        .eq('partner_id', partner.id)
+        .order('position'),
+      supabase
+        .from('v_sprint_team_reps')
+        .select('*')
+        .eq('partner_id', partner.id)
+        .order('position'),
+      supabase.from('teams').select('id, manager_ids').eq('partner_id', partner.id),
+    ])
+
+  // Manager names, resolved once for the whole partner rather than per sprint
+  // — teams.manager_ids is a plain array, not something PostgREST can embed.
+  const managerIds = Array.from(
+    new Set(((podRows ?? []) as Row[]).flatMap((r) => (r.manager_ids as string[] | null) ?? [])),
+  )
+  const managerNameById = new Map<string, string>()
+  if (managerIds.length > 0) {
+    const { data: managerPeople } = await supabase.from('people').select('id, name').in('id', managerIds)
+    for (const p of (managerPeople ?? []) as Row[]) managerNameById.set(p.id as string, p.name as string)
+  }
+  const managersByTeam = new Map<string, TeamManager[]>()
+  for (const row of (podRows ?? []) as Row[]) {
+    const ids = (row.manager_ids as string[] | null) ?? []
+    managersByTeam.set(
+      row.id as string,
+      ids
+        .filter((id) => managerNameById.has(id))
+        .map((id) => ({ personId: id, personName: managerNameById.get(id)! })),
+    )
+  }
 
   const teamsBySprint = new Map<string, SprintTeamStanding[]>()
   for (const row of (teamRows ?? []) as Row[]) {
@@ -227,6 +266,28 @@ export async function listSprints(): Promise<Sprint[]> {
     ])
   }
 
+  // Keyed by sprint, then by pod — each pod's own top 3, independent of every
+  // other pod racing in the same sprint.
+  const teamRepsBySprint = new Map<string, Record<string, SprintOverallStanding[]>>()
+  for (const row of (teamRepRows ?? []) as Row[]) {
+    const sprintId = row.sprint_id as string
+    const teamId = row.team_id as string
+    const bySprint = teamRepsBySprint.get(sprintId) ?? {}
+    bySprint[teamId] = [
+      ...(bySprint[teamId] ?? []),
+      {
+        personId: row.person_id as string,
+        personName: row.person_name as string,
+        teamId,
+        teamName: row.team_name as string,
+        closes: num(row.closes),
+        spiff: num(row.spiff),
+        position: num(row.position),
+      },
+    ]
+    teamRepsBySprint.set(sprintId, bySprint)
+  }
+
   return ((headers ?? []) as Row[]).map((row) => ({
     id: row.id as string,
     partnerId: row.partner_id as string,
@@ -246,6 +307,10 @@ export async function listSprints(): Promise<Sprint[]> {
     visible: Boolean(row.visible),
     teamStandings: teamsBySprint.get(row.id as string) ?? [],
     overall: overallBySprint.get(row.id as string) ?? [],
+    teamReps: teamRepsBySprint.get(row.id as string) ?? {},
+    teamManagers: Object.fromEntries(
+      ((row.team_ids as string[]) ?? []).map((teamId) => [teamId, managersByTeam.get(teamId) ?? []]),
+    ),
   }))
 }
 
@@ -342,7 +407,7 @@ export async function listAnnualGoals(): Promise<AnnualGoal[]> {
 export type PrizeStatus = 'leading' | 'locked_in' | 'awaiting_approval' | 'approved'
 
 export interface PrizeLine {
-  source: 'competition' | 'sprint_team' | 'sprint_rep' | 'annual_goal'
+  source: 'competition' | 'sprint_team' | 'sprint_rep' | 'sprint_manager' | 'annual_goal'
   sourceName: string
   personId: string | null
   personName: string
@@ -392,42 +457,76 @@ export async function listPrizeLines(): Promise<PrizeLine[]> {
   for (const sprint of sprints) {
     const stillRunning = running(sprint.endDate)
 
-    for (const t of sprint.teamStandings) {
-      if (t.position > 3) continue
-      const prize =
-        sprint.sprintType === 'perteam'
-          ? [sprint.teamPrizes[t.teamId]?.c1, sprint.teamPrizes[t.teamId]?.c2, sprint.teamPrizes[t.teamId]?.c3][
-              t.position - 1
-            ]
-          : [sprint.prizeTeam1, sprint.prizeTeam2, sprint.prizeTeam3][t.position - 1]
-      if (!prize) continue
-      lines.push({
-        source: 'sprint_team',
-        sourceName: sprint.name,
-        personId: null,
-        personName: t.teamName,
-        teamName: t.teamName,
-        prize,
-        status: stillRunning ? 'leading' : 'locked_in',
-      })
-    }
+    if (sprint.sprintType === 'winner') {
+      // One ladder for the whole sprint: pod rank and individual rank both
+      // race against every other pod/rep in it.
+      for (const t of sprint.teamStandings) {
+        if (t.position > 3) continue
+        const prize = [sprint.prizeTeam1, sprint.prizeTeam2, sprint.prizeTeam3][t.position - 1]
+        if (!prize) continue
+        lines.push({
+          source: 'sprint_team',
+          sourceName: sprint.name,
+          personId: null,
+          personName: t.teamName,
+          teamName: t.teamName,
+          prize,
+          status: stillRunning ? 'leading' : 'locked_in',
+        })
+      }
 
-    for (const p of sprint.overall) {
-      if (p.position > 3) continue
-      const prize =
-        sprint.sprintType === 'winner'
-          ? [sprint.prizeRep1, sprint.prizeRep2, sprint.prizeRep3][p.position - 1]
-          : undefined
-      if (!prize) continue
-      lines.push({
-        source: 'sprint_rep',
-        sourceName: sprint.name,
-        personId: p.personId,
-        personName: p.personName,
-        teamName: p.teamName,
-        prize,
-        status: stillRunning ? 'leading' : 'locked_in',
-      })
+      for (const p of sprint.overall) {
+        if (p.position > 3) continue
+        const prize = [sprint.prizeRep1, sprint.prizeRep2, sprint.prizeRep3][p.position - 1]
+        if (!prize) continue
+        lines.push({
+          source: 'sprint_rep',
+          sourceName: sprint.name,
+          personId: p.personId,
+          personName: p.personName,
+          teamName: p.teamName,
+          prize,
+          status: stillRunning ? 'leading' : 'locked_in',
+        })
+      }
+    } else {
+      // Per pod: every pod races on its own — its own 1st/2nd/3rd rep (2nd and
+      // 3rd are optional) and its own manager prize, independent of how any
+      // other pod in the sprint is doing.
+      for (const teamId of sprint.teamIds) {
+        const tp = sprint.teamPrizes[teamId]
+        if (!tp) continue
+        const teamName = sprint.teamStandings.find((t) => t.teamId === teamId)?.teamName ?? null
+
+        for (const p of sprint.teamReps[teamId] ?? []) {
+          if (p.position > 3) continue
+          const prize = [tp.c1, tp.c2, tp.c3][p.position - 1]
+          if (!prize) continue
+          lines.push({
+            source: 'sprint_rep',
+            sourceName: sprint.name,
+            personId: p.personId,
+            personName: p.personName,
+            teamName: p.teamName,
+            prize,
+            status: stillRunning ? 'leading' : 'locked_in',
+          })
+        }
+
+        if (tp.mgr) {
+          for (const mgr of sprint.teamManagers[teamId] ?? []) {
+            lines.push({
+              source: 'sprint_manager',
+              sourceName: sprint.name,
+              personId: mgr.personId,
+              personName: mgr.personName,
+              teamName,
+              prize: tp.mgr,
+              status: stillRunning ? 'leading' : 'locked_in',
+            })
+          }
+        }
+      }
     }
   }
 

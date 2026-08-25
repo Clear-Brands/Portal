@@ -86,17 +86,14 @@ export function CompetitionCard({ competition, today }: { competition: Competiti
 
 export function SprintCard({ sprint, today }: { sprint: Sprint; today: string }) {
   const running = sprint.endDate >= today
-  const teamPrizeFor = (position: number, teamId: string) =>
-    sprint.sprintType === 'perteam'
-      ? [sprint.teamPrizes[teamId]?.c1, sprint.teamPrizes[teamId]?.c2, sprint.teamPrizes[teamId]?.c3][position - 1]
-      : [sprint.prizeTeam1, sprint.prizeTeam2, sprint.prizeTeam3][position - 1]
 
   return (
     <Card>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="font-head text-[11px] tracking-[0.15em] text-muted uppercase">
-            Sprint · {sprint.teamIds.length} pods · {sprint.sprintType === 'perteam' ? 'Per-team prizes' : 'Winner takes the ladder'}
+            Sprint · {sprint.teamIds.length} pods ·{' '}
+            {sprint.sprintType === 'perteam' ? 'Prizes per pod' : 'Winner takes the ladder'}
           </p>
           <h3 className="mt-1 font-head text-[19px] leading-tight text-paper">{sprint.name}</h3>
           <div className="mt-1 flex items-center gap-2">
@@ -107,65 +104,124 @@ export function SprintCard({ sprint, today }: { sprint: Sprint; today: string })
         </div>
       </div>
 
-      <div className="mt-4 grid gap-1.5">
-        {sprint.teamStandings.map((t) => {
-          const prize = t.position <= 3 ? teamPrizeFor(t.position, t.teamId) : undefined
-          return (
-            <div
-              key={t.teamId}
-              className="flex items-center gap-3 rounded-[8px] border border-line bg-surface-2 px-3 py-2 text-[13.5px]"
-            >
-              <span className="w-6 flex-none text-center">
-                <Medal position={t.position} />
-              </span>
-              <span aria-hidden className="h-2 w-2 flex-none rounded-[2px]" style={{ background: t.teamColor }} />
-              <span className="flex-1 truncate text-paper">{t.teamName}</span>
-              <span className="num text-muted">
-                {fmtCount(t.closes)} {t.closes === 1 ? 'close' : 'closes'}
-              </span>
-              <span className="num w-20 text-right text-paper">{fmtMoney(t.spiff, true)}</span>
-              <span className="w-28 flex-none truncate text-right text-[12px] text-volt">{prize ?? ''}</span>
-            </div>
-          )
-        })}
-      </div>
+      {sprint.sprintType === 'perteam' ? (
+        <div className="mt-4 grid gap-3">
+          {sprint.teamStandings.map((t) => {
+            const tp = sprint.teamPrizes[t.teamId]
+            const reps = sprint.teamReps[t.teamId] ?? []
+            const managers = sprint.teamManagers[t.teamId] ?? []
 
-      {sprint.overall.length > 0 ? (
+            return (
+              <div key={t.teamId} className="rounded-[8px] border border-line bg-surface-2 p-3">
+                <div className="flex items-center gap-2.5">
+                  <span aria-hidden className="h-2 w-2 flex-none rounded-[2px]" style={{ background: t.teamColor }} />
+                  <span className="flex-1 truncate font-head text-[12px] tracking-[0.05em] text-paper uppercase">
+                    {t.teamName}
+                  </span>
+                  <span className="num text-[12px] text-muted">
+                    {fmtCount(t.closes)} {t.closes === 1 ? 'close' : 'closes'} ·{' '}
+                    {fmtMoney(t.spiff, true)}
+                  </span>
+                </div>
+
+                {reps.length === 0 ? (
+                  <p className="mt-2.5 text-[12.5px] text-muted">No closes yet in this window.</p>
+                ) : (
+                  <ul className="mt-2.5 grid gap-1.5">
+                    {reps.map((p) => {
+                      const prize = tp ? [tp.c1, tp.c2, tp.c3][p.position - 1] : undefined
+                      return (
+                        <li
+                          key={p.personId}
+                          className="flex items-center gap-3 rounded-[7px] bg-ink/40 px-2.5 py-1.5 text-[13px]"
+                        >
+                          <span className="w-5 flex-none text-center">
+                            <Medal position={p.position} />
+                          </span>
+                          <span className="flex-1 truncate text-paper">{p.personName}</span>
+                          <span className="num text-muted">
+                            {fmtCount(p.closes)} {p.closes === 1 ? 'close' : 'closes'}
+                          </span>
+                          <span className="w-28 flex-none truncate text-right text-[12px] text-volt">
+                            {prize ?? ''}
+                          </span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+
+                {tp?.mgr ? (
+                  <p className="mt-2.5 text-[12px] text-muted">
+                    Manager prize: <span className="text-volt">{tp.mgr}</span>
+                    {managers.length > 0 ? ` — ${managers.map((m) => m.personName).join(', ')}` : ''}
+                  </p>
+                ) : null}
+              </div>
+            )
+          })}
+        </div>
+      ) : (
         <>
-          <p className="mt-4 mb-1.5 font-head text-[11px] tracking-[0.12em] text-muted uppercase">
-            Top individuals across every pod
-          </p>
-          <ul className="grid gap-1.5">
-            {sprint.overall.map((p) => (
-              <li
-                key={p.personId}
-                className="flex items-center gap-3 rounded-[8px] border border-line bg-surface-2 px-3 py-2 text-[13.5px]"
-              >
-                <span className="w-6 flex-none text-center">
-                  <Medal position={p.position} />
-                </span>
-                <span className="flex-1 truncate text-paper">
-                  {p.personName}
-                  {p.teamName ? <span className="text-muted"> · {p.teamName}</span> : null}
-                </span>
-                <span className="num text-muted">
-                  {fmtCount(p.closes)} {p.closes === 1 ? 'close' : 'closes'}
-                </span>
-                <span className="num w-20 text-right text-paper">{fmtMoney(p.spiff, true)}</span>
-                <span className="w-28 flex-none truncate text-right text-[12px] text-volt">
-                  {sprint.sprintType === 'winner'
-                    ? [sprint.prizeRep1, sprint.prizeRep2, sprint.prizeRep3][p.position - 1]
-                    : ''}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : null}
+          <div className="mt-4 grid gap-1.5">
+            {sprint.teamStandings.map((t) => {
+              const prize = t.position <= 3 ? [sprint.prizeTeam1, sprint.prizeTeam2, sprint.prizeTeam3][t.position - 1] : undefined
+              return (
+                <div
+                  key={t.teamId}
+                  className="flex items-center gap-3 rounded-[8px] border border-line bg-surface-2 px-3 py-2 text-[13.5px]"
+                >
+                  <span className="w-6 flex-none text-center">
+                    <Medal position={t.position} />
+                  </span>
+                  <span aria-hidden className="h-2 w-2 flex-none rounded-[2px]" style={{ background: t.teamColor }} />
+                  <span className="flex-1 truncate text-paper">{t.teamName}</span>
+                  <span className="num text-muted">
+                    {fmtCount(t.closes)} {t.closes === 1 ? 'close' : 'closes'}
+                  </span>
+                  <span className="num w-20 text-right text-paper">{fmtMoney(t.spiff, true)}</span>
+                  <span className="w-28 flex-none truncate text-right text-[12px] text-volt">{prize ?? ''}</span>
+                </div>
+              )
+            })}
+          </div>
 
-      {sprint.prizeManager ? (
-        <p className="mt-3 text-[12.5px] text-muted">Manager prize: {sprint.prizeManager}</p>
-      ) : null}
+          {sprint.overall.length > 0 ? (
+            <>
+              <p className="mt-4 mb-1.5 font-head text-[11px] tracking-[0.12em] text-muted uppercase">
+                Top individuals across every pod
+              </p>
+              <ul className="grid gap-1.5">
+                {sprint.overall.map((p) => (
+                  <li
+                    key={p.personId}
+                    className="flex items-center gap-3 rounded-[8px] border border-line bg-surface-2 px-3 py-2 text-[13.5px]"
+                  >
+                    <span className="w-6 flex-none text-center">
+                      <Medal position={p.position} />
+                    </span>
+                    <span className="flex-1 truncate text-paper">
+                      {p.personName}
+                      {p.teamName ? <span className="text-muted"> · {p.teamName}</span> : null}
+                    </span>
+                    <span className="num text-muted">
+                      {fmtCount(p.closes)} {p.closes === 1 ? 'close' : 'closes'}
+                    </span>
+                    <span className="num w-20 text-right text-paper">{fmtMoney(p.spiff, true)}</span>
+                    <span className="w-28 flex-none truncate text-right text-[12px] text-volt">
+                      {[sprint.prizeRep1, sprint.prizeRep2, sprint.prizeRep3][p.position - 1]}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+
+          {sprint.prizeManager ? (
+            <p className="mt-3 text-[12.5px] text-muted">Manager prize: {sprint.prizeManager}</p>
+          ) : null}
+        </>
+      )}
     </Card>
   )
 }
