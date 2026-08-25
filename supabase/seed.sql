@@ -285,8 +285,9 @@ values (pg_temp.sid('sp1'), pg_temp.sid('p_fp'), 'Summer Showdown',
         '$500', '$250', '$300 to the winning pod''s lead', true);
 
 -- The original shipped no annual goal. One here makes the feature demonstrable.
-insert into annual_goals (id, partner_id, team_id, start_date, end_date, target, prize)
-values (pg_temp.sid('ag1'), pg_temp.sid('p_fp'), null,
+-- Empty team_ids = every pod for the partner (see 0015_closers_club_and_titles.sql).
+insert into annual_goals (id, partner_id, team_ids, start_date, end_date, target, prize)
+values (pg_temp.sid('ag1'), pg_temp.sid('p_fp'), '{}',
         date_trunc('year', current_date)::date,
         (date_trunc('year', current_date) + interval '1 year - 1 day')::date,
         12, 'Trip to Cabo');

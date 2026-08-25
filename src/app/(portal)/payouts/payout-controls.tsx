@@ -5,7 +5,7 @@ import { useActionState, useEffect, useState } from 'react'
 import { Button, fmtMoney } from '@/components/ui'
 import { ConfirmDialog } from '@/components/dialog'
 import { recordPayout, voidPayout } from '@/lib/actions/payouts'
-import type { ActionState } from '@/lib/actions/deals'
+import { approveDealComp, type ActionState } from '@/lib/actions/deals'
 
 const initial: ActionState = {}
 
@@ -163,6 +163,62 @@ export function VoidPayoutButton({
             className="w-full rounded-[8px] border border-line bg-surface-2 px-3 py-2.5 text-[15px] text-paper placeholder:text-muted/60"
           />
         </label>
+      </ConfirmDialog>
+    </>
+  )
+}
+
+/**
+ * Approving one flat-fee deal's comp — the one-time gate a flat-fee partner's
+ * closed deals need before they can be swept into a payout (0016_flat_fee_approval.sql).
+ * A deliberate small confirmation, not a `confirm()`, same as everything else
+ * that moves money in this product.
+ */
+export function ApproveCompButton({
+  dealId,
+  clientName,
+  spiffAmount,
+  partnerComp,
+}: {
+  dealId: string
+  clientName: string
+  spiffAmount: number
+  partnerComp: number
+}) {
+  const [state, action, pending] = useActionState(approveDealComp, initial)
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    if (state.ok) setOpen(false)
+  }, [state.ok])
+
+  return (
+    <>
+      <Button size="sm" onClick={() => setOpen(true)}>
+        Approve
+      </Button>
+
+      <ConfirmDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title={`Approve ${clientName}?`}
+        description="A one-time check before this can be paid — once approved, it moves into the payable batch above and can be swept into the next transfer."
+        confirmLabel="Approve"
+        pending={pending}
+        error={state.error}
+        formAction={action}
+        hiddenFields={{ dealId }}
+      >
+        <div className="rounded-[8px] border border-line bg-surface-2 px-4 py-4">
+          {spiffAmount > 0 ? (
+            <p className="text-[13px] text-muted">
+              <span className="num text-paper">{fmtMoney(spiffAmount, true)}</span> to the rep
+            </p>
+          ) : null}
+          <p className="mt-1 text-[13px] text-muted">
+            <span className="num text-paper">{fmtMoney(partnerComp, true)}</span> to the company
+          </p>
+        </div>
       </ConfirmDialog>
     </>
   )

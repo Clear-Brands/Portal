@@ -335,6 +335,25 @@ export async function listPayableBatch(): Promise<PayableLine[]> {
   return (data ?? []).map(toPayableLine)
 }
 
+/**
+ * Closed deals under a flat-fee partner still waiting on their one-time
+ * approval — held out of listPayableBatch() above until someone approves
+ * them. Same row shape as v_payable_batch, so the same mapper applies.
+ */
+export async function listCompAwaitingApproval(): Promise<PayableLine[]> {
+  const partner = await getActivePartner()
+  if (!partner) return []
+
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('v_comp_awaiting_approval')
+    .select('*')
+    .eq('partner_id', partner.id)
+    .order('closed_at')
+
+  return (data ?? []).map(toPayableLine)
+}
+
 /** The batch rolled up per person, which is how the transfer is actually paid. */
 export function groupBatchByPerson(lines: PayableLine[]) {
   const map = new Map<

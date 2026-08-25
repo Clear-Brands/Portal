@@ -232,6 +232,38 @@ export async function adjustSpiff(_prev: ActionState, formData: FormData): Promi
 }
 
 /* -------------------------------------------------------------------------- */
+/* Approving a flat-fee deal's comp                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The one-time approval a flat-fee partner's deal needs before it can be
+ * swept into a payout — see 0016_flat_fee_approval.sql. Gated on the same
+ * capability as recording a payout, since this decides what a payout is
+ * allowed to include.
+ */
+const ApproveComp = z.object({ dealId: z.uuid() })
+
+export async function approveDealComp(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const profile = await requireSession()
+  if (!can(profile, 'payouts.write')) {
+    return { error: 'Approving a payout needs payout permissions.' }
+  }
+
+  const parsed = ApproveComp.safeParse(Object.fromEntries(formData))
+  if (!parsed.success) {
+    return { error: 'Something is missing there — try again.' }
+  }
+
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('approve_deal_comp', { p_deal_id: parsed.data.dealId })
+
+  if (error) return { error: friendly(error.message) }
+
+  revalidatePath('/payouts')
+  return { ok: 'Approved — it will be included in the next payout.' }
+}
+
+/* -------------------------------------------------------------------------- */
 /* A member submitting their own referral                                      */
 /* -------------------------------------------------------------------------- */
 

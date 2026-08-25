@@ -1,10 +1,10 @@
 import { can } from '@/lib/auth/capabilities'
 import { requireSession } from '@/lib/session'
 import { getActivePartner } from '@/lib/partner-context'
-import { batchTotals, groupBatchByPerson, listPayableBatch } from '@/lib/data/deals'
+import { batchTotals, groupBatchByPerson, listCompAwaitingApproval, listPayableBatch } from '@/lib/data/deals'
 import { listPayouts, payoutHeadline } from '@/lib/data/payouts'
 import { Card, Eyebrow, Pill, SectionHeading, Button, fmtCount, fmtDate, fmtMoney } from '@/components/ui'
-import { RecordPayoutButton, VoidPayoutButton } from './payout-controls'
+import { ApproveCompButton, RecordPayoutButton, VoidPayoutButton } from './payout-controls'
 
 export const metadata = { title: 'Payouts' }
 
@@ -15,8 +15,9 @@ export default async function PayoutsPage() {
   const profile = await requireSession()
   const partner = await getActivePartner()
 
-  const [lines, payouts, headline] = await Promise.all([
+  const [lines, awaitingApproval, payouts, headline] = await Promise.all([
     listPayableBatch(),
+    listCompAwaitingApproval(),
     listPayouts(),
     payoutHeadline(),
   ])
@@ -142,6 +143,48 @@ export default async function PayoutsPage() {
           </>
         ) : null}
       </div>
+
+      {/* Awaiting approval — flat-fee deals held out of the batch above until
+          someone signs off on them once. Only ever non-empty for a partner
+          on flat-fee compensation. */}
+      {awaitingApproval.length > 0 ? (
+        <section className="mb-9">
+          <div className="mb-3">
+            <SectionHeading>Awaiting approval</SectionHeading>
+            <p className="mt-1 text-[12.5px] text-muted">
+              Closed on a flat-fee rate — each needs a one-time approval before it can be paid.
+            </p>
+          </div>
+
+          <div className="grid gap-2.5">
+            {awaitingApproval.map((line) => (
+              <Card key={line.dealId} className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <div className="text-[14px] text-paper">{line.clientName}</div>
+                  <p className="mt-0.5 text-[12.5px] text-muted">
+                    {line.personName}
+                    {line.spiffAmount > 0 ? (
+                      <>
+                        {' '}
+                        · <span className="num">{fmtMoney(line.spiffAmount, true)}</span> rep
+                      </>
+                    ) : null}{' '}
+                    · <span className="num">{fmtMoney(line.partnerComp, true)}</span> company
+                  </p>
+                </div>
+                {canPay ? (
+                  <ApproveCompButton
+                    dealId={line.dealId}
+                    clientName={line.clientName}
+                    spiffAmount={line.spiffAmount}
+                    partnerComp={line.partnerComp}
+                  />
+                ) : null}
+              </Card>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {/* History */}
       <section>
