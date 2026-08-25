@@ -9,6 +9,7 @@ import { Card, Eyebrow, Button, Pill, fmtCount, fmtMoney } from '@/components/ui
 import { Pagination } from '@/components/pagination'
 import { RosterFilterBar, type PodTab } from './roster-filter-bar'
 import { PersonRowActions } from './person-row-actions'
+import { AddPersonButton } from './add-person-button'
 
 export const metadata = { title: 'Roster' }
 
@@ -50,9 +51,12 @@ export default async function RosterPage({
         </div>
 
         {canWrite ? (
-          <Button size="sm">
-            <Link href="/roster/import">Import CSV</Link>
-          </Button>
+          <div className="flex gap-2">
+            <AddPersonButton teams={podCounts.teams} canAddManager={profile.role === 'internal'} />
+            <Button size="sm">
+              <Link href="/roster/import">Import CSV</Link>
+            </Button>
+          </div>
         ) : null}
       </div>
 

@@ -170,6 +170,97 @@ export async function enablePortalLogin(_prev: ActionState, formData: FormData):
 }
 
 /* -------------------------------------------------------------------------- */
+/* Adding one person by hand                                                   */
+/* -------------------------------------------------------------------------- */
+
+const AddPerson = z.object({
+  name: z.string().trim().min(1, 'A name is required').max(160),
+  email: z.email('Enter a valid email address'),
+  teamId: z.string().trim().optional().default(''),
+  title: z.string().trim().max(120).optional().default(''),
+  kind: z.enum(['rep', 'manager']).optional().default('rep'),
+  createLogin: z.string().optional(),
+})
+
+/**
+ * "Sometimes I just need to add one person, not a whole spreadsheet" —
+ * Cristian, Loom walkthrough. The CSV importer stays for batches; this is the
+ * one-at-a-time sibling, sharing its rules: kind = 'manager' is Clear Brands
+ * staff only (same restriction `restrictManagersToInternal` applies to a CSV
+ * row, and the same thing 0008_rls.sql's `people_write_partner_admin` policy
+ * would refuse at the database layer regardless — checked here first so a
+ * partner admin gets a clear reason instead of a raw policy-violation error).
+ */
+export async function addPerson(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const profile = await requireSession()
+  if (!can(profile, 'people.write')) {
+    return { error: 'Adding to the roster needs people permissions.' }
+  }
+
+  const partner = await getActivePartner()
+  if (!partner) return { error: 'No partner program is selected.' }
+
+  const parsed = AddPerson.safeParse(Object.fromEntries(formData))
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Check the form and try again.' }
+  }
+
+  if (parsed.data.kind === 'manager' && profile.role !== 'internal') {
+    return { error: 'Only Clear Brands staff can add pod managers.' }
+  }
+
+  const email = parsed.data.email.toLowerCase()
+  const supabase = await createClient()
+  const { data: person, error } = await supabase
+    .from('people')
+    .insert({
+      partner_id: partner.id,
+      team_id: parsed.data.teamId || null,
+      name: parsed.data.name,
+      email,
+      kind: parsed.data.kind,
+      title: parsed.data.title || null,
+      active: true,
+    })
+    .select('id, name, email')
+    .single()
+
+  if (error || !person) return { error: friendly(error?.message ?? '') }
+
+  revalidatePath('/roster')
+
+  if (parsed.data.createLogin !== 'on') {
+    return { ok: `${person.name} added to the roster.` }
+  }
+
+  const admin = createAdminClient()
+  const { data: created, error: inviteError } = await admin.auth.admin.inviteUserByEmail(person.email, {
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+  })
+
+  if (inviteError || !created.user) {
+    return { ok: `${person.name} added to the roster. Their login invite could not be sent — try "Send login invite" from their row.` }
+  }
+
+  const { error: profileError } = await admin.from('profiles').insert({
+    user_id: created.user.id,
+    partner_id: partner.id,
+    person_id: person.id,
+    role: 'member',
+    access: 'none',
+    name: person.name,
+    email: person.email,
+  })
+
+  if (profileError) {
+    await admin.auth.admin.deleteUser(created.user.id)
+    return { ok: `${person.name} added to the roster. Their login invite could not be sent — try "Send login invite" from their row.` }
+  }
+
+  return { ok: `${person.name} added to the roster. Invite sent to ${person.email}.` }
+}
+
+/* -------------------------------------------------------------------------- */
 /* CSV import                                                                   */
 /* -------------------------------------------------------------------------- */
 
