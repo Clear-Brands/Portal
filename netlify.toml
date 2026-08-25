@@ -14,6 +14,19 @@
   command = "npm run build"
   publish = ".next"
 
+# `npm run build` runs `next build --webpack`, not the Turbopack default Next
+# 16 ships with. Turbopack production builds are brand new (Next 16 just
+# made them the default), and this site was showing a random ~40-50% failure
+# rate on ordinary page loads and on "Add a deal" — a pattern across every
+# route, not any one page, with nothing on Supabase's side to explain it,
+# which points at something in how Netlify's Next.js Runtime packages a
+# Turbopack build into functions rather than at this app's own code. Forcing
+# webpack, the older and far more battle-tested bundler, is the single most
+# actionable fix available without direct access to Netlify's function logs.
+# If page loads are still flaky after this ships, that theory is wrong and
+# Netlify's own function logs (Site -> Functions -> logs) are the next place
+# to look, not this app's code.
+
 [build.environment]
   NODE_VERSION = "22"
   NPM_FLAGS = "--no-audit --no-fund"

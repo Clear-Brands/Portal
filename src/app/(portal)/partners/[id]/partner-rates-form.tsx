@@ -55,6 +55,18 @@ export function PartnerRatesForm({ partner }: { partner: Partner }) {
         </select>
       </Field>
 
+      {/*
+        compFlat and compPct must both be present in every submission — the
+        server's UpdateRates schema requires both as numbers, since
+        compute_partner_comp() only reads whichever one comp_mode picks out,
+        so there's no harm in always sending both. Whichever one isn't the
+        active mode's field falls back to a hidden input carrying its last
+        saved value forward, so switching modes and back doesn't lose it.
+        (Rendering only the active field with no fallback for the other was
+        the bug: picking "Flat amount per close" left no compPct field in the
+        form at all, so submitting failed every time with "Invalid input:
+        expected number, received NaN" — the rate could never actually be saved.)
+      */}
       {compMode === 'flat' ? (
         <Field label="Flat amount">
           <input
@@ -66,7 +78,9 @@ export function PartnerRatesForm({ partner }: { partner: Partner }) {
             className={inputClass}
           />
         </Field>
-      ) : null}
+      ) : (
+        <input type="hidden" name="compFlat" value={partner.compFlat} />
+      )}
 
       {compMode === 'pct' ? (
         <Field label="Percentage">
@@ -80,7 +94,9 @@ export function PartnerRatesForm({ partner }: { partner: Partner }) {
             className={inputClass}
           />
         </Field>
-      ) : null}
+      ) : (
+        <input type="hidden" name="compPct" value={partner.compPct} />
+      )}
 
       {compMode !== 'none' ? (
         <Field label="Basis">
@@ -90,11 +106,7 @@ export function PartnerRatesForm({ partner }: { partner: Partner }) {
           </select>
         </Field>
       ) : (
-        <>
-          <input type="hidden" name="compFlat" value={0} />
-          <input type="hidden" name="compPct" value={0} />
-          <input type="hidden" name="compBasis" value={partner.compBasis} />
-        </>
+        <input type="hidden" name="compBasis" value={partner.compBasis} />
       )}
 
       {state.error ? <Notice tone="error">{state.error}</Notice> : null}
