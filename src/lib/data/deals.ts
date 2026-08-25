@@ -354,18 +354,41 @@ export async function listCompAwaitingApproval(): Promise<PayableLine[]> {
   return (data ?? []).map(toPayableLine)
 }
 
-/** The batch rolled up per person, which is how the transfer is actually paid. */
+export interface BatchPersonDeal {
+  dealId: string
+  clientName: string
+  spiffAmount: number
+  closedAt: string
+}
+
+/** The batch rolled up per person, which is how the transfer is actually paid.
+ *  Each row also keeps its own contributing deals — a lump sum with nowhere
+ *  to point back to is exactly what makes reconciling one hard. */
 export function groupBatchByPerson(lines: PayableLine[]) {
   const map = new Map<
     string,
-    { personId: string; personName: string; teamName: string | null; amount: number; deals: number }
+    {
+      personId: string
+      personName: string
+      teamName: string | null
+      amount: number
+      deals: number
+      lines: BatchPersonDeal[]
+    }
   >()
 
   for (const line of lines) {
+    const deal: BatchPersonDeal = {
+      dealId: line.dealId,
+      clientName: line.clientName,
+      spiffAmount: line.spiffAmount,
+      closedAt: line.closedAt,
+    }
     const existing = map.get(line.personId)
     if (existing) {
       existing.amount += line.spiffAmount
       existing.deals += 1
+      existing.lines.push(deal)
     } else {
       map.set(line.personId, {
         personId: line.personId,
@@ -373,6 +396,7 @@ export function groupBatchByPerson(lines: PayableLine[]) {
         teamName: line.teamName,
         amount: line.spiffAmount,
         deals: 1,
+        lines: [deal],
       })
     }
   }

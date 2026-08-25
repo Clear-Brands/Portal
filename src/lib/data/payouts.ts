@@ -12,9 +12,18 @@ import { toPayout, toPayoutLine, type Payout, type PayoutLine } from '@/lib/type
  * nulled the link between the deals and the batch, which destroyed exactly that.
  */
 
+export interface PayoutPersonRollup {
+  personId: string | null
+  personName: string
+  teamName: string
+  amount: number
+  /** Deal-level lines that make up this amount — kind = 'spiff' only. */
+  lines: PayoutLine[]
+}
+
 export interface PayoutWithLines extends Payout {
   lines: PayoutLine[]
-  perPerson: { personId: string | null; personName: string; teamName: string; amount: number }[]
+  perPerson: PayoutPersonRollup[]
 }
 
 export async function listPayouts(limitMonths = 24): Promise<Payout[]> {
@@ -30,6 +39,38 @@ export async function listPayouts(limitMonths = 24): Promise<Payout[]> {
     .limit(limitMonths)
 
   return (data ?? []).map(toPayout)
+}
+
+/**
+ * The same history, with each transfer's per-person breakdown attached — one
+ * bounded pair of queries rather than one round trip per transfer (history is
+ * capped at limitMonths, so this stays small). What "reconciling a lump-sum
+ * payout" actually needs: not just the total that hit the bank, but which
+ * rep's amount was made of which deals.
+ */
+export async function listPayoutsWithLines(limitMonths = 24): Promise<PayoutWithLines[]> {
+  const headers = await listPayouts(limitMonths)
+  if (headers.length === 0) return []
+
+  const supabase = await createClient()
+  const { data: lineRows } = await supabase
+    .from('payout_lines')
+    .select('*')
+    .in(
+      'payout_id',
+      headers.map((h) => h.id),
+    )
+    .order('amount', { ascending: false })
+
+  const linesByPayout = new Map<string, PayoutLine[]>()
+  for (const row of (lineRows ?? []).map(toPayoutLine)) {
+    linesByPayout.set(row.payoutId, [...(linesByPayout.get(row.payoutId) ?? []), row])
+  }
+
+  return headers.map((h) => {
+    const lines = linesByPayout.get(h.id) ?? []
+    return { ...h, lines, perPerson: rollUpByPerson(lines) }
+  })
 }
 
 export async function getPayout(id: string): Promise<PayoutWithLines | null> {
@@ -48,20 +89,29 @@ export async function getPayout(id: string): Promise<PayoutWithLines | null> {
   return { ...toPayout(header), lines: mapped, perPerson: rollUpByPerson(mapped) }
 }
 
-/** Line items grouped the way the transfer is actually distributed. */
+/** Line items grouped the way the transfer is actually distributed. Each row
+ *  keeps its own contributing deals (kind = 'spiff' lines only — the company
+ *  cut has no deal-level lines to drill into), so a rep's lump sum in the
+ *  history below can be reconciled against exactly what made it up. */
 export function rollUpByPerson(lines: PayoutLine[]) {
-  const map = new Map<string, { personId: string | null; personName: string; teamName: string; amount: number }>()
+  const map = new Map<
+    string,
+    { personId: string | null; personName: string; teamName: string; amount: number; lines: PayoutLine[] }
+  >()
 
   for (const line of lines) {
     const key = line.personId ?? `company:${line.personName}`
     const existing = map.get(key)
-    if (existing) existing.amount += line.amount
-    else
+    if (existing) {
+      existing.amount += line.amount
+      if (line.kind === 'spiff') existing.lines.push(line)
+    } else
       map.set(key, {
         personId: line.personId,
         personName: line.personName,
         teamName: line.teamName,
         amount: line.amount,
+        lines: line.kind === 'spiff' ? [line] : [],
       })
   }
 
