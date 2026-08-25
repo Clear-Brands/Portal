@@ -1,7 +1,8 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useState } from 'react'
 
+import { useActionState } from '@/lib/use-resilient-action'
 import { Button, Field, Notice, inputClass } from '@/components/ui'
 import { updatePartnerRates } from '@/lib/actions/partners'
 import type { ActionState } from '@/lib/actions/deals'

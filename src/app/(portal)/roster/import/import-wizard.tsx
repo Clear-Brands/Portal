@@ -1,7 +1,8 @@
 'use client'
 
-import { useActionState, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 
+import { useActionState } from '@/lib/use-resilient-action'
 import { Button, Notice, Pill, cn, fmtCount } from '@/components/ui'
 import { commitRosterImport, previewRosterImport, type ImportPreviewState } from '@/lib/actions/roster'
 import type { ActionState } from '@/lib/actions/deals'

@@ -1,8 +1,9 @@
 'use client'
 
-import { useActionState, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 
+import { useActionState } from '@/lib/use-resilient-action'
 import { Button, Field, Notice, cn, inputClass } from '@/components/ui'
 import { createAnnualGoal, createCompetition, createSprint } from '@/lib/actions/programs'
 import type { ActionState } from '@/lib/actions/deals'

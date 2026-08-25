@@ -1,8 +1,9 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 
+import { useActionState } from '@/lib/use-resilient-action'
 import { Button, Field, Notice, inputClass } from '@/components/ui'
 import { sendSignInLink, signInWithPassword, type AuthState } from './actions'
 

@@ -1,8 +1,8 @@
 'use client'
 
-import { useActionState } from 'react'
 import Link from 'next/link'
 
+import { useActionState } from '@/lib/use-resilient-action'
 import { Button, Field, Notice, inputClass } from '@/components/ui'
 import { addDeal, type ActionState } from '@/lib/actions/deals'
 import type { PersonOption } from '@/lib/types'
