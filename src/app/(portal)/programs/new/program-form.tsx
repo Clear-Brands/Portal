@@ -131,6 +131,7 @@ function CompetitionForm({ teams }: { teams: TeamOption[] }) {
 function SprintForm({ teams }: { teams: TeamOption[] }) {
   const [state, action, pending] = useActionState(createSprint, initial)
   const [sprintType, setSprintType] = useState<'winner' | 'perteam'>('winner')
+  const [repPrizeScope, setRepPrizeScope] = useState<'sprint_wide' | 'winning_pod'>('sprint_wide')
   const [selectedTeamIds, setSelectedTeamIds] = useState<string[]>([])
 
   const selectedTeams = useMemo(
@@ -193,29 +194,50 @@ function SprintForm({ teams }: { teams: TeamOption[] }) {
 
       {sprintType === 'winner' ? (
         <>
+          <p className="text-[12px] text-muted">
+            Every prize below is independently optional — leave any of them blank to skip that
+            piece entirely. Want just a manager prize? Leave the pod and rep prizes blank. Want
+            the winning pod&rsquo;s own rep and manager rewarded together? Set the rep scope to
+            &ldquo;Winning pod&rsquo;s own top rep&rdquo; below and fill in both.
+          </p>
+
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="1st pod prize">
+            <Field label="1st pod prize" hint="Optional">
               <input className={inputClass} name="prizeTeam1" maxLength={160} />
             </Field>
-            <Field label="2nd pod prize">
+            <Field label="2nd pod prize" hint="Optional">
               <input className={inputClass} name="prizeTeam2" maxLength={160} />
             </Field>
-            <Field label="3rd pod prize">
+            <Field label="3rd pod prize" hint="Optional">
               <input className={inputClass} name="prizeTeam3" maxLength={160} />
             </Field>
           </div>
+
+          <Field label="Rep prize scope">
+            <select
+              className={inputClass}
+              name="repPrizeScope"
+              value={repPrizeScope}
+              onChange={(e) => setRepPrizeScope(e.target.value as 'sprint_wide' | 'winning_pod')}
+            >
+              <option value="sprint_wide">Top individuals across every pod</option>
+              <option value="winning_pod">Just the winning pod&rsquo;s own top rep</option>
+            </select>
+          </Field>
+
           <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="1st rep prize">
+            <Field label="1st rep prize" hint="Optional">
               <input className={inputClass} name="prizeRep1" maxLength={160} />
             </Field>
-            <Field label="2nd rep prize">
+            <Field label="2nd rep prize" hint="Optional">
               <input className={inputClass} name="prizeRep2" maxLength={160} />
             </Field>
-            <Field label="3rd rep prize">
+            <Field label="3rd rep prize" hint="Optional">
               <input className={inputClass} name="prizeRep3" maxLength={160} />
             </Field>
           </div>
-          <Field label="Winning pod's manager">
+
+          <Field label="Winning pod's manager" hint="Optional — pays whoever manages the #1-ranked pod">
             <input className={inputClass} name="prizeManager" maxLength={160} placeholder="$300 bonus" />
           </Field>
         </>

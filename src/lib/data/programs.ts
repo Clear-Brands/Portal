@@ -161,6 +161,8 @@ export interface Sprint {
   startDate: string
   endDate: string
   sprintType: 'winner' | 'perteam'
+  /** 'winner' sprints only — see the column comment in 0019. */
+  repPrizeScope: 'sprint_wide' | 'winning_pod'
   teamIds: string[]
   prizeTeam1: string
   prizeTeam2: string
@@ -295,6 +297,7 @@ export async function listSprints(): Promise<Sprint[]> {
     startDate: row.start_date as string,
     endDate: row.end_date as string,
     sprintType: row.sprint_type as 'winner' | 'perteam',
+    repPrizeScope: (row.rep_prize_scope as 'sprint_wide' | 'winning_pod') ?? 'sprint_wide',
     teamIds: (row.team_ids as string[]) ?? [],
     prizeTeam1: (row.prize_team_1 as string) ?? '',
     prizeTeam2: (row.prize_team_2 as string) ?? '',
@@ -458,8 +461,10 @@ export async function listPrizeLines(): Promise<PrizeLine[]> {
     const stillRunning = running(sprint.endDate)
 
     if (sprint.sprintType === 'winner') {
-      // One ladder for the whole sprint: pod rank and individual rank both
-      // race against every other pod/rep in it.
+      // One ladder for the whole sprint: pod rank races every other pod in
+      // it. The rep prize either does the same (sprint-wide top 3, the
+      // default) or — repPrizeScope 'winning_pod' — is narrowed to just the
+      // #1 pod's own top 3, independent of how the rest of the sprint went.
       for (const t of sprint.teamStandings) {
         if (t.position > 3) continue
         const prize = [sprint.prizeTeam1, sprint.prizeTeam2, sprint.prizeTeam3][t.position - 1]
@@ -475,7 +480,13 @@ export async function listPrizeLines(): Promise<PrizeLine[]> {
         })
       }
 
-      for (const p of sprint.overall) {
+      const winningTeamId = sprint.teamStandings.find((t) => t.position === 1)?.teamId ?? null
+      const repPool =
+        sprint.repPrizeScope === 'winning_pod'
+          ? (winningTeamId ? (sprint.teamReps[winningTeamId] ?? []) : [])
+          : sprint.overall
+
+      for (const p of repPool) {
         if (p.position > 3) continue
         const prize = [sprint.prizeRep1, sprint.prizeRep2, sprint.prizeRep3][p.position - 1]
         if (!prize) continue
@@ -488,6 +499,28 @@ export async function listPrizeLines(): Promise<PrizeLine[]> {
           prize,
           status: stillRunning ? 'leading' : 'locked_in',
         })
+      }
+
+      // The manager prize was collected on the form and printed back on the
+      // card, but — same bug 0017 fixed on the 'perteam' side — never turned
+      // into a PrizeLine, so it never showed up anywhere a person could see
+      // they're owed it. It always belongs to the winning pod specifically
+      // (that's the one thing every one of Cristian's described prize
+      // combinations agrees on), so it rides on the same #1 pod computed
+      // above rather than needing its own lookup.
+      if (sprint.prizeManager && winningTeamId) {
+        for (const mgr of sprint.teamManagers[winningTeamId] ?? []) {
+          const winningTeamName = sprint.teamStandings.find((t) => t.teamId === winningTeamId)?.teamName ?? null
+          lines.push({
+            source: 'sprint_manager',
+            sourceName: sprint.name,
+            personId: mgr.personId,
+            personName: mgr.personName,
+            teamName: winningTeamName,
+            prize: sprint.prizeManager,
+            status: stillRunning ? 'leading' : 'locked_in',
+          })
+        }
       }
     } else {
       // Per pod: every pod races on its own — its own 1st/2nd/3rd rep (2nd and

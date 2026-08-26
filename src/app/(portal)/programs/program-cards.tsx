@@ -186,40 +186,62 @@ export function SprintCard({ sprint, today }: { sprint: Sprint; today: string })
             })}
           </div>
 
-          {sprint.overall.length > 0 ? (
-            <>
-              <p className="mt-4 mb-1.5 font-head text-[11px] tracking-[0.12em] text-muted uppercase">
-                Top individuals across every pod
-              </p>
-              <ul className="grid gap-1.5">
-                {sprint.overall.map((p) => (
-                  <li
-                    key={p.personId}
-                    className="flex items-center gap-3 rounded-[8px] border border-line bg-surface-2 px-3 py-2 text-[13.5px]"
-                  >
-                    <span className="w-6 flex-none text-center">
-                      <Medal position={p.position} />
-                    </span>
-                    <span className="flex-1 truncate text-paper">
-                      {p.personName}
-                      {p.teamName ? <span className="text-muted"> · {p.teamName}</span> : null}
-                    </span>
-                    <span className="num text-muted">
-                      {fmtCount(p.closes)} {p.closes === 1 ? 'close' : 'closes'}
-                    </span>
-                    <span className="num w-20 text-right text-paper">{fmtMoney(p.spiff, true)}</span>
-                    <span className="w-28 flex-none truncate text-right text-[12px] text-volt">
-                      {[sprint.prizeRep1, sprint.prizeRep2, sprint.prizeRep3][p.position - 1]}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : null}
+          {(() => {
+            const winningTeamId = sprint.teamStandings.find((t) => t.position === 1)?.teamId ?? null
+            const repList =
+              sprint.repPrizeScope === 'winning_pod'
+                ? winningTeamId
+                  ? (sprint.teamReps[winningTeamId] ?? [])
+                  : []
+                : sprint.overall
+            const repHeading =
+              sprint.repPrizeScope === 'winning_pod'
+                ? "Winning pod's own top rep"
+                : 'Top individuals across every pod'
+            const managers = winningTeamId ? (sprint.teamManagers[winningTeamId] ?? []) : []
 
-          {sprint.prizeManager ? (
-            <p className="mt-3 text-[12.5px] text-muted">Manager prize: {sprint.prizeManager}</p>
-          ) : null}
+            return (
+              <>
+                {repList.length > 0 ? (
+                  <>
+                    <p className="mt-4 mb-1.5 font-head text-[11px] tracking-[0.12em] text-muted uppercase">
+                      {repHeading}
+                    </p>
+                    <ul className="grid gap-1.5">
+                      {repList.map((p) => (
+                        <li
+                          key={p.personId}
+                          className="flex items-center gap-3 rounded-[8px] border border-line bg-surface-2 px-3 py-2 text-[13.5px]"
+                        >
+                          <span className="w-6 flex-none text-center">
+                            <Medal position={p.position} />
+                          </span>
+                          <span className="flex-1 truncate text-paper">
+                            {p.personName}
+                            {p.teamName ? <span className="text-muted"> · {p.teamName}</span> : null}
+                          </span>
+                          <span className="num text-muted">
+                            {fmtCount(p.closes)} {p.closes === 1 ? 'close' : 'closes'}
+                          </span>
+                          <span className="num w-20 text-right text-paper">{fmtMoney(p.spiff, true)}</span>
+                          <span className="w-28 flex-none truncate text-right text-[12px] text-volt">
+                            {[sprint.prizeRep1, sprint.prizeRep2, sprint.prizeRep3][p.position - 1]}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : null}
+
+                {sprint.prizeManager ? (
+                  <p className="mt-3 text-[12.5px] text-muted">
+                    Manager prize: <span className="text-volt">{sprint.prizeManager}</span>
+                    {managers.length > 0 ? ` — ${managers.map((m) => m.personName).join(', ')}` : ''}
+                  </p>
+                ) : null}
+              </>
+            )
+          })()}
         </>
       )}
     </Card>
