@@ -30,25 +30,44 @@ export function PartnerRatesForm({ partner }: { partner: Partner }) {
         />
       </Field>
 
-      <Field
-        label="Rev-share %"
-        hint={
-          compMode === 'ongoing_pct'
-            ? "The rate below applies here too — this is what \"Percentage of ongoing rev share\" pays, once a deal is approved."
-            : 'Applied to the accruing monthly base each statement.'
-        }
-      >
-        <input
-          name="revsharePct"
-          type="number"
-          min={0}
-          max={100}
-          step="0.001"
-          required
-          defaultValue={partner.revsharePct}
-          className={inputClass}
-        />
-      </Field>
+      {/*
+        This field is genuinely dual-purpose: it's always the rate the
+        monthly Rev share statement bills live accounts at (see
+        revshare_statements / revshare_pct in 0018), independent of comp
+        mode entirely — and it is ALSO, only when compMode is
+        'ongoing_pct', the rate a newly-approved deal's ongoing comp uses.
+        Showing it unconditionally, sitting right above "Partner
+        compensation," made it read as a compensation input even for
+        partners with Rev share off and a flat/percentage-per-close comp
+        mode — Cristian's "I want to get rid of this... this needs to be
+        gone" on the walkthrough (Aug 2026). So it now only appears when
+        one of those two things it actually feeds is true; otherwise a
+        hidden input carries its last saved value forward untouched, same
+        pattern as compFlat/compPct below.
+      */}
+      {partner.revshareEnabled || compMode === 'ongoing_pct' ? (
+        <Field
+          label="Rev-share %"
+          hint={
+            compMode === 'ongoing_pct'
+              ? "The rate below applies here too — this is what \"Percentage of ongoing rev share\" pays, once a deal is approved."
+              : 'Applied to the accruing monthly base each statement.'
+          }
+        >
+          <input
+            name="revsharePct"
+            type="number"
+            min={0}
+            max={100}
+            step="0.001"
+            required
+            defaultValue={partner.revsharePct}
+            className={inputClass}
+          />
+        </Field>
+      ) : (
+        <input type="hidden" name="revsharePct" value={partner.revsharePct} />
+      )}
 
       <Field label="Partner compensation">
         <select
@@ -118,7 +137,7 @@ export function PartnerRatesForm({ partner }: { partner: Partner }) {
       {compMode === 'flat' || compMode === 'pct' ? (
         <Field label="Basis">
           <select name="compBasis" defaultValue={partner.compBasis} className={inputClass}>
-            <option value="first_month">First month's value</option>
+            <option value="first_month">First month&rsquo;s value</option>
             <option value="contract">Full contract value</option>
           </select>
         </Field>
