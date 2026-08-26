@@ -67,7 +67,7 @@ export async function recordRevshareStatement(_prev: ActionState, formData: Form
 }
 
 const Void = z.object({
-  statementId: z.uuid(),
+  statementId: z.guid(),
   reason: z.string().trim().min(3, 'Say why this statement is being voided — it stays on the record').max(300),
 })
 
@@ -99,7 +99,7 @@ export async function voidRevshareStatement(_prev: ActionState, formData: FormDa
 /* -------------------------------------------------------------------------- */
 
 const SetLive = z.object({
-  dealId: z.uuid(),
+  dealId: z.guid(),
   live: z.enum(['true', 'false']),
 })
 
@@ -127,7 +127,7 @@ export async function setAccountLiveState(_prev: ActionState, formData: FormData
 }
 
 const AddToProgramme = z.object({
-  dealId: z.uuid(),
+  dealId: z.guid(),
   monthlyValue: z.coerce.number().positive('Enter a monthly value greater than zero').max(1_000_000),
 })
 
@@ -170,7 +170,7 @@ export async function addDealToRevshareProgramme(
  * per 0018), so an edit today only changes what future statements compute.
  */
 const UpdateMonthlyValue = z.object({
-  dealId: z.uuid(),
+  dealId: z.guid(),
   monthlyValue: z.coerce.number().positive('Enter a monthly value greater than zero').max(1_000_000),
 })
 

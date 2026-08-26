@@ -58,7 +58,7 @@ export async function recordPayout(_prev: ActionState, formData: FormData): Prom
 }
 
 const Void = z.object({
-  payoutId: z.uuid(),
+  payoutId: z.guid(),
   reason: z
     .string()
     .trim()
@@ -93,7 +93,7 @@ export async function voidPayout(_prev: ActionState, formData: FormData): Promis
 
 /** Correcting the reference or date on a batch that has already been recorded. */
 const Amend = z.object({
-  payoutId: z.uuid(),
+  payoutId: z.guid(),
   reference: z.string().trim().min(1, 'A reference is required').max(120),
   paidDate: z.iso.date('Enter a valid date'),
 })

@@ -32,7 +32,7 @@ import type { ActionState } from '@/lib/actions/deals'
 /* -------------------------------------------------------------------------- */
 
 const EditPerson = z.object({
-  personId: z.uuid(),
+  personId: z.guid(),
   name: z.string().trim().min(1, 'A name is required').max(160),
   email: z.email('Enter a valid email address'),
   teamId: z.string().trim().optional().default(''),
@@ -68,7 +68,7 @@ export async function editPerson(_prev: ActionState, formData: FormData): Promis
 }
 
 const SetActive = z.object({
-  personId: z.uuid(),
+  personId: z.guid(),
   active: z.enum(['true', 'false']),
 })
 
@@ -104,7 +104,7 @@ export async function setPersonActive(_prev: ActionState, formData: FormData): P
 /* Enabling a portal login                                                     */
 /* -------------------------------------------------------------------------- */
 
-const EnableLogin = z.object({ personId: z.uuid() })
+const EnableLogin = z.object({ personId: z.guid() })
 
 export async function enablePortalLogin(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const profile = await requireSession()

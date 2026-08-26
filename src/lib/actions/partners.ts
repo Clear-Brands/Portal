@@ -129,7 +129,7 @@ export async function onboardPartner(_prev: OnboardState, formData: FormData): P
 }
 
 const AddAdmin = z.object({
-  partnerId: z.uuid(),
+  partnerId: z.guid(),
   name: z.string().trim().min(1, 'A name is required').max(160),
   email: z.email('Enter a valid email address'),
 })
@@ -251,7 +251,7 @@ export async function addInternalLogin(_prev: ActionState, formData: FormData): 
 /* -------------------------------------------------------------------------- */
 
 const UpdateProfile = z.object({
-  partnerId: z.uuid(),
+  partnerId: z.guid(),
   name: z.string().trim().min(1, 'A partner name is required').max(160),
   timezone: z.string().trim().min(1),
   brandAccent: z
@@ -301,7 +301,7 @@ export async function updatePartnerProfile(_prev: ActionState, formData: FormDat
 }
 
 const UpdateRates = z.object({
-  partnerId: z.uuid(),
+  partnerId: z.guid(),
   defaultSpiff: z.coerce.number().min(0),
   revsharePct: z.coerce.number().min(0).max(100),
   compMode: z.enum(['none', 'flat', 'pct', 'ongoing_pct']),
@@ -347,7 +347,7 @@ export async function updatePartnerRates(_prev: ActionState, formData: FormData)
 /* Archive / restore                                                           */
 /* -------------------------------------------------------------------------- */
 
-const PartnerIdOnly = z.object({ partnerId: z.uuid() })
+const PartnerIdOnly = z.object({ partnerId: z.guid() })
 
 export async function archivePartner(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const profile = await requireSession()
@@ -388,7 +388,7 @@ export async function restorePartner(_prev: ActionState, formData: FormData): Pr
 /* -------------------------------------------------------------------------- */
 
 const UpdatePerms = z.object({
-  profileId: z.uuid(),
+  profileId: z.guid(),
   scope: z.string().min(1),
 })
 

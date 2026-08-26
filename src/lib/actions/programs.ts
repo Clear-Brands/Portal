@@ -95,7 +95,7 @@ const SprintSchema = z
     endDate: z.iso.date('Enter a valid end date'),
     sprintType: z.enum(['winner', 'perteam']),
     repPrizeScope: z.enum(['sprint_wide', 'winning_pod']).optional().default('sprint_wide'),
-    teamIds: z.array(z.uuid()).min(2, 'A sprint needs at least two pods'),
+    teamIds: z.array(z.guid()).min(2, 'A sprint needs at least two pods'),
     prizeTeam1: z.string().trim().max(160).optional().default(''),
     prizeTeam2: z.string().trim().max(160).optional().default(''),
     prizeTeam3: z.string().trim().max(160).optional().default(''),
@@ -185,7 +185,7 @@ export async function createSprint(_prev: ActionState, formData: FormData): Prom
 
 const AnnualGoalSchema = z
   .object({
-    teamIds: z.array(z.uuid()).optional().default([]),
+    teamIds: z.array(z.guid()).optional().default([]),
     startDate: z.iso.date('Enter a valid start date'),
     endDate: z.iso.date('Enter a valid end date'),
     target: z.coerce.number().int('Whole closes only').min(1, 'At least one close is required'),
@@ -235,8 +235,8 @@ export async function createAnnualGoal(_prev: ActionState, formData: FormData): 
 /* -------------------------------------------------------------------------- */
 
 const ApproveGoalAward = z.object({
-  goalId: z.uuid(),
-  personId: z.uuid(),
+  goalId: z.guid(),
+  personId: z.guid(),
 })
 
 export async function approveGoalAward(_prev: ActionState, formData: FormData): Promise<ActionState> {

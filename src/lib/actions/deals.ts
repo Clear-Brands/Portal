@@ -98,8 +98,15 @@ export async function addDeal(_prev: ActionState, formData: FormData): Promise<A
 /* Moving a deal                                                               */
 /* -------------------------------------------------------------------------- */
 
+// z.guid() checks the same hex-dash-hex shape Postgres's uuid column
+// enforces. z.uuid() additionally demands a valid RFC4122 version/variant
+// nibble — seed data's deterministic pseudo-ids (pg_temp.sid() in
+// supabase/seed.sql) don't follow that convention, so every action taking
+// an id here uses z.guid() rather than reject real, valid rows as
+// "Invalid UUID." (Found live: editing Anchor Plumbing Co's monthly value
+// on Rev share failed with "Invalid input" for exactly this reason.)
 const Transition = z.object({
-  dealId: z.uuid(),
+  dealId: z.guid(),
   status: z.enum(DEAL_STATUSES),
   lostReason: z.string().trim().max(300).optional().default(''),
 })
@@ -150,10 +157,10 @@ export async function transitionDeal(
 /* -------------------------------------------------------------------------- */
 
 const EditDeal = z.object({
-  dealId: z.uuid(),
+  dealId: z.guid(),
   clientName: z.string().trim().min(1, 'A client name is required').max(160),
   service: z.string().trim().max(80).optional().default(''),
-  personId: z.uuid().optional(),
+  personId: z.guid().optional(),
   city: z.string().trim().max(80).optional().default(''),
   state: z.string().trim().max(2).optional().default(''),
   contact: z.string().trim().max(120).optional().default(''),
@@ -202,7 +209,7 @@ export async function editDeal(_prev: ActionState, formData: FormData): Promise<
  * which is why it has its own capability and its own action.
  */
 const AdjustSpiff = z.object({
-  dealId: z.uuid(),
+  dealId: z.guid(),
   spiffAmount: z.coerce.number().min(0, 'A spiff cannot be negative').max(1_000_000),
 })
 
@@ -241,7 +248,7 @@ export async function adjustSpiff(_prev: ActionState, formData: FormData): Promi
  * capability as recording a payout, since this decides what a payout is
  * allowed to include.
  */
-const ApproveComp = z.object({ dealId: z.uuid() })
+const ApproveComp = z.object({ dealId: z.guid() })
 
 export async function approveDealComp(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const profile = await requireSession()
