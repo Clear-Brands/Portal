@@ -4,7 +4,9 @@ import { useActionState as useReactActionState } from 'react'
 
 /**
  * A drop-in replacement for React's useActionState that retries a failed
- * server action once before giving up.
+ * server action before giving up, and — this is the part the single-retry
+ * version didn't do — never lets a repeat failure escape to the page-level
+ * error boundary.
  *
  * Every mutation failure captured in production so far — the flat-fee save
  * that inspired this, "First invoice paid" on a real deal, switching the
@@ -17,16 +19,28 @@ import { useActionState as useReactActionState } from 'react'
  * *client's* fetch that invokes the action, which is exactly what trips the
  * nearest error.tsx. Next.js's own background link-prefetches survive this
  * same failure invisibly because they retry on their own; a form submission
- * gets no such retry today, so a transient blip that a page load shrugs off
- * turns a mutation into a hard crash instead.
+ * got no such retry before this hook existed, so a transient blip that a
+ * page load shrugs off turned a mutation into a hard crash instead.
  *
- * This wraps the action reference passed to useActionState so a thrown
- * network-level failure gets one silent retry (after a short pause) before
- * it's allowed to reach the error boundary — closing that same gap for
- * mutations that Next already closes for page loads. A validation failure
- * (bad input, no permission, a business rule) never triggers this: those
- * come back as a normal `{ error: "..." }` state, not a thrown exception, so
- * they still show up immediately as-is and are never retried.
+ * A single retry cut how often that happened but didn't close it — a hiccup
+ * lasting longer than the ~700ms gap between two attempts still took out
+ * both, and the raw throw that escaped still swapped the whole page (or, for
+ * a confirm dialog like "Mark this deal payable?", the dialog itself) for
+ * the crash screen, taking whatever the person had just typed with it. Two
+ * changes here: up to two retries with a longer, increasing pause between
+ * attempts (network blips are rarely millisecond-scale, so giving the
+ * connection more room to recover matters more than trying faster), and —
+ * if every attempt still fails — resolving to an ordinary `{ error }` state
+ * instead of re-throwing. Every action in this app already returns that
+ * exact shape for a validation failure, so the same inline error text and
+ * "try again" the form already shows for "that email's taken" now shows up
+ * here too, with the form or dialog still open and their input intact,
+ * rather than a full-page crash for what's genuinely just a network blip.
+ *
+ * A validation failure (bad input, no permission, a business rule) never
+ * touches this retry/fallback path at all: those come back as a normal
+ * `{ error: "..." }` state on the first try, not a thrown exception, so they
+ * still show up immediately as-is.
  *
  * Tradeoff worth knowing: if a request's *response* were lost after the
  * database write had already gone through — as opposed to the request never
@@ -36,20 +50,34 @@ import { useActionState as useReactActionState } from 'react'
  * state), so the practical risk is a duplicate activity-log entry, not a
  * duplicate charge or a duplicate payout — those still require a separate,
  * deliberate approval step. Given every real failure so far shows zero
- * partial writes, one retry is worth that small residual risk.
+ * partial writes, a couple of retries is worth that small residual risk.
  */
-export function useActionState<State, Payload>(
+const RETRY_DELAYS_MS = [600, 1500]
+
+export function useActionState<State extends { error?: string }, Payload>(
   action: (state: Awaited<State>, payload: Payload) => State | Promise<State>,
   initialState: Awaited<State>,
   permalink?: string,
 ) {
   const resilientAction = async (state: Awaited<State>, payload: Payload) => {
-    try {
-      return await action(state, payload)
-    } catch {
-      await new Promise((resolve) => setTimeout(resolve, 700))
-      return await action(state, payload)
+    let lastError: unknown
+
+    for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+      if (attempt > 0) {
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt - 1]))
+      }
+      try {
+        return await action(state, payload)
+      } catch (err) {
+        lastError = err
+      }
     }
+
+    // Every attempt hit the same wall. Log it for the record, then degrade
+    // into the same { error } shape a validation failure already returns —
+    // never let this reach the caller as a throw.
+    console.error('Action failed after retries:', lastError)
+    return { error: "That didn't save — the connection hiccuped. Try again in a moment." } as State
   }
 
   return useReactActionState(resilientAction, initialState, permalink)
