@@ -115,28 +115,31 @@ export async function transitionDeal(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const profile = await requireSession()
-  if (!can(profile, 'deals.write')) {
-    return { error: 'You do not have permission to move deals.' }
-  }
-
-  const parsed = Transition.safeParse(Object.fromEntries(formData))
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? 'That status is not valid.' }
-  }
-
-  if (parsed.data.status === 'paid') {
-    return {
-      error:
-        'Deals become Paid by recording a payout, not by moving them. Use Record payout on the Payouts tab.',
-    }
-  }
-
-  if (parsed.data.status === 'lost' && !parsed.data.lostReason) {
-    return { error: 'Give a reason so the rep can see why the deal was closed out.' }
-  }
-
+  // TEMPORARY — the whole body is wrapped for diagnosis. The first pass only
+  // wrapped the RPC call and still got the same bare digest, so whatever's
+  // throwing is upstream of that. Remove this wrapper once root-caused.
   try {
+    const profile = await requireSession()
+    if (!can(profile, 'deals.write')) {
+      return { error: 'You do not have permission to move deals.' }
+    }
+
+    const parsed = Transition.safeParse(Object.fromEntries(formData))
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message ?? 'That status is not valid.' }
+    }
+
+    if (parsed.data.status === 'paid') {
+      return {
+        error:
+          'Deals become Paid by recording a payout, not by moving them. Use Record payout on the Payouts tab.',
+      }
+    }
+
+    if (parsed.data.status === 'lost' && !parsed.data.lostReason) {
+      return { error: 'Give a reason so the rep can see why the deal was closed out.' }
+    }
+
     const supabase = await createClient()
     const { error } = await supabase.rpc('transition_deal', {
       p_deal_id: parsed.data.dealId,
@@ -152,7 +155,6 @@ export async function transitionDeal(
     revalidatePath('/')
     return { ok: 'Deal updated.' }
   } catch (err) {
-    // TEMPORARY — diagnosing the "Mark payable" 500. Remove once root-caused.
     return {
       error: `DEBUG: ${err instanceof Error ? `${err.message}\n${err.stack}` : String(err)}`,
     }
