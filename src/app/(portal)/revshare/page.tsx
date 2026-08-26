@@ -7,16 +7,10 @@ import {
   listRevshareCandidates,
   listRevshareStatements,
   revshareHeadline,
-  type LiveAccount,
 } from '@/lib/data/revshare'
 import { Button, Card, Eyebrow, Pill, SectionHeading, fmtCount, fmtMoney } from '@/components/ui'
-import {
-  AddToProgrammeButton,
-  MarkChurnedButton,
-  MarkLiveButton,
-  RecordRevshareButton,
-  VoidRevshareButton,
-} from './revshare-controls'
+import { AddToProgrammeButton, RecordRevshareButton, VoidRevshareButton } from './revshare-controls'
+import { AccountList } from './account-list'
 
 export const metadata = { title: 'Rev share' }
 
@@ -36,8 +30,6 @@ export default async function RevsharePage() {
   const candidates = canWrite ? await listRevshareCandidates() : []
 
   const total = accruingTotal(accounts)
-  const top = accounts.slice(0, 8)
-  const rest = accounts.slice(8)
 
   return (
     <>
@@ -80,28 +72,7 @@ export default async function RevsharePage() {
           </div>
         </div>
 
-        {top.length > 0 ? (
-          <ul className="mt-6 grid gap-1.5">
-            {top.map((a) => (
-              <AccountRow key={a.dealId} account={a} canWrite={canWrite} />
-            ))}
-          </ul>
-        ) : (
-          <p className="mt-6 text-[13.5px] text-muted">Nothing in the programme yet.</p>
-        )}
-
-        {rest.length > 0 ? (
-          <details className="mt-3">
-            <summary className="cursor-pointer text-[13px] text-muted hover:text-paper">
-              +{rest.length} more — view everyone
-            </summary>
-            <ul className="mt-3 grid gap-1.5">
-              {rest.map((a) => (
-                <AccountRow key={a.dealId} account={a} canWrite={canWrite} />
-              ))}
-            </ul>
-          </details>
-        ) : null}
+        <AccountList accounts={accounts} canWrite={canWrite} />
       </div>
 
       <section>
@@ -179,25 +150,5 @@ export default async function RevsharePage() {
         )}
       </section>
     </>
-  )
-}
-
-function AccountRow({ account: a, canWrite }: { account: LiveAccount; canWrite: boolean }) {
-  return (
-    <li className="flex flex-wrap items-center gap-3 rounded-[8px] border border-line bg-surface-2 px-3.5 py-2.5 text-[13.5px]">
-      <span className="flex-1 truncate text-paper">{a.clientName}</span>
-      <span className="text-[12px] text-muted">
-        {a.personName}
-        {a.teamName ? ` · ${a.teamName}` : ''}
-      </span>
-      {a.live === null ? <Pill tone="neutral">Pending</Pill> : null}
-      <span className="num w-24 text-right text-paper">{fmtMoney(a.monthlyValue, true)}/mo</span>
-      {canWrite ? (
-        <span className="flex gap-1.5">
-          {a.live === null ? <MarkLiveButton dealId={a.dealId} /> : null}
-          <MarkChurnedButton dealId={a.dealId} clientName={a.clientName} />
-        </span>
-      ) : null}
-    </li>
   )
 }

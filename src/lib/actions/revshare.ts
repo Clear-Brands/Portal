@@ -159,6 +159,47 @@ export async function addDealToRevshareProgramme(
   return { ok: 'Added to the rev-share programme.' }
 }
 
+/**
+ * Editing a live account's monthly value in place — for when the underlying
+ * contract changes (the account grows, a price goes up) and the number this
+ * page bills against needs to change with it. Cristian on the Loom walkthrough
+ * (Aug 2026), pointing at Anchor Plumbing Co: "we're gonna need to be able to
+ * edit this deal." Only the number changes here; live/churned state has its
+ * own action above, and this never touches a statement already recorded —
+ * those keep whatever monthly_value was billed at the time (revshare_lines
+ * per 0018), so an edit today only changes what future statements compute.
+ */
+const UpdateMonthlyValue = z.object({
+  dealId: z.uuid(),
+  monthlyValue: z.coerce.number().positive('Enter a monthly value greater than zero').max(1_000_000),
+})
+
+export async function updateAccountMonthlyValue(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const profile = await requireSession()
+  if (!can(profile, 'deals.write')) {
+    return { error: 'Editing an account needs deal permissions.' }
+  }
+
+  const parsed = UpdateMonthlyValue.safeParse(Object.fromEntries(formData))
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Check the form and try again.' }
+  }
+
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('deals')
+    .update({ monthly_value: parsed.data.monthlyValue })
+    .eq('id', parsed.data.dealId)
+
+  if (error) return { error: friendly(error.message) }
+
+  revalidatePath('/revshare')
+  return { ok: 'Monthly value updated.' }
+}
+
 /* -------------------------------------------------------------------------- */
 
 function friendly(message: string): string {

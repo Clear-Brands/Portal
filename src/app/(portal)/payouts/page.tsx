@@ -1,3 +1,5 @@
+import Link from 'next/link'
+
 import { can } from '@/lib/auth/capabilities'
 import { requireSession } from '@/lib/session'
 import { getActivePartner } from '@/lib/partner-context'
@@ -5,6 +7,7 @@ import { batchTotals, groupBatchByPerson, listCompAwaitingApproval, listPayableB
 import { listPayoutsWithLines, payoutHeadline } from '@/lib/data/payouts'
 import { Card, Eyebrow, Pill, SectionHeading, Button, fmtCount, fmtDate, fmtMoney } from '@/components/ui'
 import { ApproveCompButton, RecordPayoutButton, VoidPayoutButton } from './payout-controls'
+import { PayableList } from './payable-list'
 
 export const metadata = { title: 'Payouts' }
 
@@ -107,50 +110,7 @@ export default async function PayoutsPage() {
               ) : null}
             </div>
 
-            <ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {top.map((p, i) => (
-                <li key={p.personId} className="text-[13px]">
-                  <details>
-                    <summary className="flex cursor-pointer list-none items-center gap-2.5 text-paper marker:content-none [&::-webkit-details-marker]:hidden">
-                      <span
-                        aria-hidden
-                        className="h-2 w-2 flex-none rounded-[2px]"
-                        style={{ background: SPLIT_COLORS[i % SPLIT_COLORS.length] }}
-                      />
-                      <span className="flex-1 truncate">{p.personName}</span>
-                      <span className="num text-muted">{fmtMoney(p.amount, true)}</span>
-                    </summary>
-                    <DealDrilldown
-                      deals={p.lines.map((l) => ({ key: l.dealId, clientName: l.clientName, amount: l.spiffAmount }))}
-                    />
-                  </details>
-                </li>
-              ))}
-            </ul>
-
-            {rest.length > 0 ? (
-              <details className="mt-3">
-                <summary className="cursor-pointer text-[13px] text-muted hover:text-paper">
-                  +{rest.length} more · {fmtMoney(restTotal, true)} — view everyone
-                </summary>
-                <ul className="mt-3 max-h-[250px] overflow-y-auto rounded-[8px] border border-line">
-                  {rest.map((p) => (
-                    <li key={p.personId} className="border-b border-line px-3.5 py-2 text-[13px] last:border-b-0">
-                      <details>
-                        <summary className="flex cursor-pointer list-none items-center gap-3 text-paper marker:content-none [&::-webkit-details-marker]:hidden">
-                          <span className="flex-1 truncate">{p.personName}</span>
-                          <span className="text-[12px] text-muted">{p.teamName}</span>
-                          <span className="num text-muted">{fmtMoney(p.amount, true)}</span>
-                        </summary>
-                        <DealDrilldown
-                      deals={p.lines.map((l) => ({ key: l.dealId, clientName: l.clientName, amount: l.spiffAmount }))}
-                    />
-                      </details>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            ) : null}
+            <PayableList perPerson={perPerson} />
           </>
         ) : null}
       </div>
@@ -172,7 +132,12 @@ export default async function PayoutsPage() {
             {awaitingApproval.map((line) => (
               <Card key={line.dealId} className="flex flex-wrap items-center justify-between gap-4">
                 <div>
-                  <div className="text-[14px] text-paper">{line.clientName}</div>
+                  <Link
+                    href={`/deals/${line.dealId}`}
+                    className="text-[14px] text-paper hover:text-volt hover:underline"
+                  >
+                    {line.clientName}
+                  </Link>
                   <p className="mt-0.5 text-[12.5px] text-muted">
                     {line.personName}
                     {line.spiffAmount > 0 ? (
@@ -305,6 +270,7 @@ export default async function PayoutsPage() {
                               <DealDrilldown
                                 deals={p.lines.map((l) => ({
                                   key: l.id,
+                                  dealId: l.dealId,
                                   clientName: l.clientName,
                                   amount: l.amount,
                                 }))}
@@ -333,14 +299,26 @@ export default async function PayoutsPage() {
 
 /** A rep's (or the company's) rolled-up amount, expanded to the individual
  *  deals it came from — the deal-level reconciliation both the pre-payment
- *  batch and the recorded history need. */
-function DealDrilldown({ deals }: { deals: { key: string | null; clientName: string; amount: number }[] }) {
+ *  batch and the recorded history need. Each row links straight to that
+ *  deal's own page when we know its id, instead of just naming it — Cristian
+ *  on the Loom walkthrough: "if we click this, it goes directly to that deal." */
+function DealDrilldown({
+  deals,
+}: {
+  deals: { key: string | null; dealId: string | null; clientName: string; amount: number }[]
+}) {
   if (deals.length === 0) return null
   return (
     <ul className="mt-1.5 ml-4 grid gap-1 border-l border-line pl-3">
       {deals.map((d, i) => (
         <li key={d.key ?? i} className="flex items-center gap-2 text-[12px] text-muted">
-          <span className="flex-1 truncate">{d.clientName}</span>
+          {d.dealId ? (
+            <Link href={`/deals/${d.dealId}`} className="flex-1 truncate hover:text-paper hover:underline">
+              {d.clientName}
+            </Link>
+          ) : (
+            <span className="flex-1 truncate">{d.clientName}</span>
+          )}
           <span className="num text-paper">{fmtMoney(d.amount, true)}</span>
         </li>
       ))}

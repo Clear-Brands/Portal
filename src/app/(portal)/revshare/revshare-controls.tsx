@@ -1,14 +1,16 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import { useActionState } from '@/lib/use-resilient-action'
+import { useCloseOnSuccess } from '@/lib/use-close-on-success'
 import { Button, Field, fmtMoney, inputClass } from '@/components/ui'
 import { ConfirmDialog } from '@/components/dialog'
 import {
   addDealToRevshareProgramme,
   recordRevshareStatement,
   setAccountLiveState,
+  updateAccountMonthlyValue,
   voidRevshareStatement,
 } from '@/lib/actions/revshare'
 import type { ActionState } from '@/lib/actions/deals'
@@ -29,9 +31,7 @@ export function RecordRevshareButton({
   const [state, action, pending] = useActionState(recordRevshareStatement, initial)
   const [open, setOpen] = useState(false)
 
-  useEffect(() => {
-    if (state.ok) setOpen(false)
-  }, [state.ok])
+  useCloseOnSuccess(state.ok, setOpen)
 
   if (alreadyRecorded) {
     return (
@@ -108,9 +108,7 @@ export function VoidRevshareButton({
   const [state, action, pending] = useActionState(voidRevshareStatement, initial)
   const [open, setOpen] = useState(false)
 
-  useEffect(() => {
-    if (state.ok) setOpen(false)
-  }, [state.ok])
+  useCloseOnSuccess(state.ok, setOpen)
 
   return (
     <>
@@ -158,9 +156,7 @@ export function MarkChurnedButton({ dealId, clientName }: { dealId: string; clie
   const [state, action, pending] = useActionState(setAccountLiveState, initial)
   const [open, setOpen] = useState(false)
 
-  useEffect(() => {
-    if (state.ok) setOpen(false)
-  }, [state.ok])
+  useCloseOnSuccess(state.ok, setOpen)
 
   return (
     <>
@@ -179,6 +175,55 @@ export function MarkChurnedButton({ dealId, clientName }: { dealId: string; clie
         formAction={action}
         hiddenFields={{ dealId, live: 'false' }}
       />
+    </>
+  )
+}
+
+/** Edit a live (or pending) account's monthly value in place — the contract
+ *  changed, so the number this page bills against needs to. */
+export function EditMonthlyValueButton({
+  dealId,
+  clientName,
+  monthlyValue,
+}: {
+  dealId: string
+  clientName: string
+  monthlyValue: number
+}) {
+  const [state, action, pending] = useActionState(updateAccountMonthlyValue, initial)
+  const [open, setOpen] = useState(false)
+
+  useCloseOnSuccess(state.ok, setOpen)
+
+  return (
+    <>
+      <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
+        Edit
+      </Button>
+
+      <ConfirmDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title={`Edit ${clientName}'s monthly value?`}
+        description="Changes what future statements bill this account at. Anything already recorded stays as it was."
+        confirmLabel="Save"
+        pending={pending}
+        error={state.error}
+        formAction={action}
+        hiddenFields={{ dealId }}
+      >
+        <Field label="Monthly value" hint="What this account bills the partner per month">
+          <input
+            className={inputClass}
+            name="monthlyValue"
+            type="number"
+            min={0.01}
+            step="0.01"
+            required
+            defaultValue={monthlyValue}
+          />
+        </Field>
+      </ConfirmDialog>
     </>
   )
 }
@@ -206,9 +251,7 @@ export function AddToProgrammeButton({
   const [state, action, pending] = useActionState(addDealToRevshareProgramme, initial)
   const [open, setOpen] = useState(false)
 
-  useEffect(() => {
-    if (state.ok) setOpen(false)
-  }, [state.ok])
+  useCloseOnSuccess(state.ok, setOpen)
 
   if (candidates.length === 0) return null
 
