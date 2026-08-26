@@ -32,7 +32,7 @@ const empty: ActionState = {}
 /* -------------------------------------------------------------------------- */
 
 const NewDeal = z.object({
-  personId: z.uuid('Choose which rep this referral belongs to'),
+  personId: z.guid('Choose which rep this referral belongs to'),
   clientName: z.string().trim().min(1, 'A client name is required').max(160),
   service: z.string().trim().max(80).optional().default(''),
   city: z.string().trim().max(80).optional().default(''),
@@ -115,50 +115,41 @@ export async function transitionDeal(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  // TEMPORARY — the whole body is wrapped for diagnosis. The first pass only
-  // wrapped the RPC call and still got the same bare digest, so whatever's
-  // throwing is upstream of that. Remove this wrapper once root-caused.
-  try {
-    const profile = await requireSession()
-    if (!can(profile, 'deals.write')) {
-      return { error: 'You do not have permission to move deals.' }
-    }
+  const profile = await requireSession()
+  if (!can(profile, 'deals.write')) {
+    return { error: 'You do not have permission to move deals.' }
+  }
 
-    const parsed = Transition.safeParse(Object.fromEntries(formData))
-    if (!parsed.success) {
-      return { error: parsed.error.issues[0]?.message ?? 'That status is not valid.' }
-    }
+  const parsed = Transition.safeParse(Object.fromEntries(formData))
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'That status is not valid.' }
+  }
 
-    if (parsed.data.status === 'paid') {
-      return {
-        error:
-          'Deals become Paid by recording a payout, not by moving them. Use Record payout on the Payouts tab.',
-      }
-    }
-
-    if (parsed.data.status === 'lost' && !parsed.data.lostReason) {
-      return { error: 'Give a reason so the rep can see why the deal was closed out.' }
-    }
-
-    const supabase = await createClient()
-    const { error } = await supabase.rpc('transition_deal', {
-      p_deal_id: parsed.data.dealId,
-      p_status: parsed.data.status,
-      p_lost_reason: parsed.data.lostReason,
-    })
-
-    if (error) return { error: friendly(error.message) }
-
-    revalidatePath('/deals')
-    revalidatePath('/deals/pipeline')
-    revalidatePath('/payouts')
-    revalidatePath('/')
-    return { ok: 'Deal updated.' }
-  } catch (err) {
+  if (parsed.data.status === 'paid') {
     return {
-      error: `DEBUG: ${err instanceof Error ? `${err.message}\n${err.stack}` : String(err)}`,
+      error:
+        'Deals become Paid by recording a payout, not by moving them. Use Record payout on the Payouts tab.',
     }
   }
+
+  if (parsed.data.status === 'lost' && !parsed.data.lostReason) {
+    return { error: 'Give a reason so the rep can see why the deal was closed out.' }
+  }
+
+  const supabase = await createClient()
+  const { error } = await supabase.rpc('transition_deal', {
+    p_deal_id: parsed.data.dealId,
+    p_status: parsed.data.status,
+    p_lost_reason: parsed.data.lostReason,
+  })
+
+  if (error) return { error: friendly(error.message) }
+
+  revalidatePath('/deals')
+  revalidatePath('/deals/pipeline')
+  revalidatePath('/payouts')
+  revalidatePath('/')
+  return { ok: 'Deal updated.' }
 }
 
 /* -------------------------------------------------------------------------- */
