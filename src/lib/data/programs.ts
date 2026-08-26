@@ -6,8 +6,9 @@ import { getActivePartner, partnerToday } from '@/lib/partner-context'
 /**
  * Programme reads.
  *
- * Every ranking here comes from a view in 0009_views.sql — v_competition_standings,
- * v_sprint_team_standings, v_sprint_overall, v_annual_goal_standings — which run as
+ * Every ranking here comes from a view — v_competition_standings and
+ * v_annual_goal_standings (0009_views.sql), v_sprint_pod_standings and
+ * v_sprint_rep_standings (0020_sprint_prize_slots.sql) — which run as
  * their owner and do their own tenancy and visibility filtering. This module reads
  * those views and the header tables (competitions, sprints, annual_goals) and merges
  * them in TypeScript. That merge is structural only: grouping rows that are already
@@ -123,64 +124,64 @@ export async function listCompetitions(): Promise<Competition[]> {
 /* Sprints                                                                     */
 /* -------------------------------------------------------------------------- */
 
-export interface SprintTeamStanding {
+export interface SprintPodStanding {
   teamId: string
   teamName: string
   teamColor: string
+  managerIds: string[]
+  managerNames: string[]
   closes: number
   spiff: number
   position: number
+  /** Frozen (from sprint_pod_results) once the sprint is closed, live otherwise. */
+  isClosed: boolean
 }
 
-export interface SprintOverallStanding {
+export interface SprintRepStanding {
+  teamId: string
   personId: string
   personName: string
-  teamId: string | null
-  teamName: string | null
   closes: number
   spiff: number
+  /** Rank within this rep's own pod — never against the other pods in the sprint. */
   position: number
+  isClosed: boolean
 }
 
-export interface TeamPrize {
-  c1: string
-  c2: string
-  c3: string
-  mgr: string
-}
-
-export interface TeamManager {
-  personId: string
-  personName: string
-}
-
+/**
+ * Six independent prize slots — see the schema comment on `SprintSchema` in
+ * actions/programs.ts. Each `*Enabled` flag has a matching `*Prize` string;
+ * a slot with no prize text set is still "enabled" until the admin fills one
+ * in, so callers should treat `enabled && prize` as "actually pays out."
+ */
 export interface Sprint {
   id: string
   partnerId: string
   name: string
   startDate: string
   endDate: string
-  sprintType: 'winner' | 'perteam'
-  /** 'winner' sprints only — see the column comment in 0019. */
-  repPrizeScope: 'sprint_wide' | 'winning_pod'
   teamIds: string[]
-  prizeTeam1: string
-  prizeTeam2: string
-  prizeTeam3: string
-  prizeRep1: string
-  prizeRep2: string
-  prizeRep3: string
-  prizeManager: string
-  teamPrizes: Record<string, TeamPrize>
+  podRep1Enabled: boolean
+  podRep1Prize: string
+  podRep2Enabled: boolean
+  podRep2Prize: string
+  podRep3Enabled: boolean
+  podRep3Prize: string
+  podManagerEnabled: boolean
+  podManagerPrize: string
+  topRepTopPodEnabled: boolean
+  topRepTopPodPrize: string
+  topPodManagerEnabled: boolean
+  topPodManagerPrize: string
   visible: boolean
-  teamStandings: SprintTeamStanding[]
-  overall: SprintOverallStanding[]
-  /** 'perteam' only — each pod's own top 3 reps, ranked within that pod alone
-   *  (v_sprint_team_reps), not against the other pods racing in the sprint. */
-  teamReps: Record<string, SprintOverallStanding[]>
-  /** Every pod's manager(s) — teams.manager_ids resolved to a name, so
-   *  `team_prizes[teamId].mgr` has someone to attach itself to. */
-  teamManagers: Record<string, TeamManager[]>
+  /** Null while running — a sprint's end date is a target, not an auto-cutoff.
+   *  Set only by the manual "Close sprint" action. */
+  closedAt: string | null
+  closedBy: string | null
+  /** Ranked by position ascending — position 1 is the leading pod. */
+  podStandings: SprintPodStanding[]
+  /** Keyed by pod, each pod's own reps ranked 1-3 within that pod alone. */
+  repStandingsByPod: Record<string, SprintRepStanding[]>
 }
 
 export async function listSprints(): Promise<Sprint[]> {
@@ -189,105 +190,55 @@ export async function listSprints(): Promise<Sprint[]> {
 
   const supabase = await createClient()
 
-  const [{ data: headers }, { data: teamRows }, { data: overallRows }, { data: teamRepRows }, { data: podRows }] =
-    await Promise.all([
-      supabase
-        .from('sprints')
-        .select('*')
-        .eq('partner_id', partner.id)
-        .order('start_date', { ascending: false }),
-      supabase
-        .from('v_sprint_team_standings')
-        .select('*')
-        .eq('partner_id', partner.id)
-        .order('position'),
-      supabase
-        .from('v_sprint_overall')
-        .select('*')
-        .eq('partner_id', partner.id)
-        .order('position'),
-      supabase
-        .from('v_sprint_team_reps')
-        .select('*')
-        .eq('partner_id', partner.id)
-        .order('position'),
-      supabase.from('teams').select('id, manager_ids').eq('partner_id', partner.id),
-    ])
+  // v_sprint_pod_standings / v_sprint_rep_standings already carry manager
+  // names and switch live vs. frozen rows on their own (union of
+  // v_sprint_*_live for an open sprint, sprint_*_results for a closed one) —
+  // nothing else here needs to know which state a given sprint is in.
+  const [{ data: headers }, { data: podRows }, { data: repRows }] = await Promise.all([
+    supabase.from('sprints').select('*').eq('partner_id', partner.id).order('start_date', { ascending: false }),
+    supabase.from('v_sprint_pod_standings').select('*').eq('partner_id', partner.id).order('position'),
+    supabase.from('v_sprint_rep_standings').select('*').eq('partner_id', partner.id).order('position'),
+  ])
 
-  // Manager names, resolved once for the whole partner rather than per sprint
-  // — teams.manager_ids is a plain array, not something PostgREST can embed.
-  const managerIds = Array.from(
-    new Set(((podRows ?? []) as Row[]).flatMap((r) => (r.manager_ids as string[] | null) ?? [])),
-  )
-  const managerNameById = new Map<string, string>()
-  if (managerIds.length > 0) {
-    const { data: managerPeople } = await supabase.from('people').select('id, name').in('id', managerIds)
-    for (const p of (managerPeople ?? []) as Row[]) managerNameById.set(p.id as string, p.name as string)
-  }
-  const managersByTeam = new Map<string, TeamManager[]>()
+  const podsBySprint = new Map<string, SprintPodStanding[]>()
   for (const row of (podRows ?? []) as Row[]) {
-    const ids = (row.manager_ids as string[] | null) ?? []
-    managersByTeam.set(
-      row.id as string,
-      ids
-        .filter((id) => managerNameById.has(id))
-        .map((id) => ({ personId: id, personName: managerNameById.get(id)! })),
-    )
-  }
-
-  const teamsBySprint = new Map<string, SprintTeamStanding[]>()
-  for (const row of (teamRows ?? []) as Row[]) {
     const id = row.sprint_id as string
-    teamsBySprint.set(id, [
-      ...(teamsBySprint.get(id) ?? []),
+    podsBySprint.set(id, [
+      ...(podsBySprint.get(id) ?? []),
       {
         teamId: row.team_id as string,
         teamName: row.team_name as string,
         teamColor: (row.team_color as string) ?? '#6b6f76',
+        managerIds: (row.manager_ids as string[]) ?? [],
+        managerNames: (row.manager_names as string[]) ?? [],
         closes: num(row.closes),
         spiff: num(row.spiff),
         position: num(row.position),
-      },
-    ])
-  }
-
-  const overallBySprint = new Map<string, SprintOverallStanding[]>()
-  for (const row of (overallRows ?? []) as Row[]) {
-    const id = row.sprint_id as string
-    overallBySprint.set(id, [
-      ...(overallBySprint.get(id) ?? []),
-      {
-        personId: row.person_id as string,
-        personName: row.person_name as string,
-        teamId: (row.team_id as string) ?? null,
-        teamName: (row.team_name as string) ?? null,
-        closes: num(row.closes),
-        spiff: num(row.spiff),
-        position: num(row.position),
+        isClosed: Boolean(row.is_closed),
       },
     ])
   }
 
   // Keyed by sprint, then by pod — each pod's own top 3, independent of every
   // other pod racing in the same sprint.
-  const teamRepsBySprint = new Map<string, Record<string, SprintOverallStanding[]>>()
-  for (const row of (teamRepRows ?? []) as Row[]) {
+  const repsBySprint = new Map<string, Record<string, SprintRepStanding[]>>()
+  for (const row of (repRows ?? []) as Row[]) {
     const sprintId = row.sprint_id as string
     const teamId = row.team_id as string
-    const bySprint = teamRepsBySprint.get(sprintId) ?? {}
+    const bySprint = repsBySprint.get(sprintId) ?? {}
     bySprint[teamId] = [
       ...(bySprint[teamId] ?? []),
       {
+        teamId,
         personId: row.person_id as string,
         personName: row.person_name as string,
-        teamId,
-        teamName: row.team_name as string,
         closes: num(row.closes),
         spiff: num(row.spiff),
         position: num(row.position),
+        isClosed: Boolean(row.is_closed),
       },
     ]
-    teamRepsBySprint.set(sprintId, bySprint)
+    repsBySprint.set(sprintId, bySprint)
   }
 
   return ((headers ?? []) as Row[]).map((row) => ({
@@ -296,24 +247,24 @@ export async function listSprints(): Promise<Sprint[]> {
     name: row.name as string,
     startDate: row.start_date as string,
     endDate: row.end_date as string,
-    sprintType: row.sprint_type as 'winner' | 'perteam',
-    repPrizeScope: (row.rep_prize_scope as 'sprint_wide' | 'winning_pod') ?? 'sprint_wide',
     teamIds: (row.team_ids as string[]) ?? [],
-    prizeTeam1: (row.prize_team_1 as string) ?? '',
-    prizeTeam2: (row.prize_team_2 as string) ?? '',
-    prizeTeam3: (row.prize_team_3 as string) ?? '',
-    prizeRep1: (row.prize_rep_1 as string) ?? '',
-    prizeRep2: (row.prize_rep_2 as string) ?? '',
-    prizeRep3: (row.prize_rep_3 as string) ?? '',
-    prizeManager: (row.prize_manager as string) ?? '',
-    teamPrizes: (row.team_prizes as Record<string, TeamPrize>) ?? {},
+    podRep1Enabled: Boolean(row.pod_rep_1_enabled),
+    podRep1Prize: (row.pod_rep_1_prize as string) ?? '',
+    podRep2Enabled: Boolean(row.pod_rep_2_enabled),
+    podRep2Prize: (row.pod_rep_2_prize as string) ?? '',
+    podRep3Enabled: Boolean(row.pod_rep_3_enabled),
+    podRep3Prize: (row.pod_rep_3_prize as string) ?? '',
+    podManagerEnabled: Boolean(row.pod_manager_enabled),
+    podManagerPrize: (row.pod_manager_prize as string) ?? '',
+    topRepTopPodEnabled: Boolean(row.top_rep_top_pod_enabled),
+    topRepTopPodPrize: (row.top_rep_top_pod_prize as string) ?? '',
+    topPodManagerEnabled: Boolean(row.top_pod_manager_enabled),
+    topPodManagerPrize: (row.top_pod_manager_prize as string) ?? '',
     visible: Boolean(row.visible),
-    teamStandings: teamsBySprint.get(row.id as string) ?? [],
-    overall: overallBySprint.get(row.id as string) ?? [],
-    teamReps: teamRepsBySprint.get(row.id as string) ?? {},
-    teamManagers: Object.fromEntries(
-      ((row.team_ids as string[]) ?? []).map((teamId) => [teamId, managersByTeam.get(teamId) ?? []]),
-    ),
+    closedAt: (row.closed_at as string) ?? null,
+    closedBy: (row.closed_by as string) ?? null,
+    podStandings: podsBySprint.get(row.id as string) ?? [],
+    repStandingsByPod: repsBySprint.get(row.id as string) ?? {},
   }))
 }
 
@@ -362,8 +313,7 @@ export async function listAnnualGoals(): Promise<AnnualGoal[]> {
       .eq('partner_id', partner.id)
       .order('closes', { ascending: false }),
     // team_ids is a plain array, not a foreign key PostgREST can embed —
-    // resolve pod names in TypeScript instead, the same way createSprint's
-    // teamPrizes are keyed by id rather than joined.
+    // resolve pod names in TypeScript instead.
     supabase.from('teams').select('id, name').eq('partner_id', partner.id),
   ])
 
@@ -458,108 +408,86 @@ export async function listPrizeLines(): Promise<PrizeLine[]> {
   }
 
   for (const sprint of sprints) {
-    const stillRunning = running(sprint.endDate)
+    // A sprint's end date is a target, not an auto-cutoff — standings keep
+    // moving until an admin manually closes it. `closedAt` is the only real
+    // "this is final" signal now; endDate no longer decides it.
+    const stillRunning = sprint.closedAt === null
+    const status = stillRunning ? 'leading' : 'locked_in'
+    const topPod = sprint.podStandings.find((p) => p.position === 1) ?? null
 
-    if (sprint.sprintType === 'winner') {
-      // One ladder for the whole sprint: pod rank races every other pod in
-      // it. The rep prize either does the same (sprint-wide top 3, the
-      // default) or — repPrizeScope 'winning_pod' — is narrowed to just the
-      // #1 pod's own top 3, independent of how the rest of the sprint went.
-      for (const t of sprint.teamStandings) {
-        if (t.position > 3) continue
-        const prize = [sprint.prizeTeam1, sprint.prizeTeam2, sprint.prizeTeam3][t.position - 1]
-        if (!prize) continue
-        lines.push({
-          source: 'sprint_team',
-          sourceName: sprint.name,
-          personId: null,
-          personName: t.teamName,
-          teamName: t.teamName,
-          prize,
-          status: stillRunning ? 'leading' : 'locked_in',
-        })
-      }
-
-      const winningTeamId = sprint.teamStandings.find((t) => t.position === 1)?.teamId ?? null
-      const repPool =
-        sprint.repPrizeScope === 'winning_pod'
-          ? (winningTeamId ? (sprint.teamReps[winningTeamId] ?? []) : [])
-          : sprint.overall
-
-      for (const p of repPool) {
-        if (p.position > 3) continue
-        const prize = [sprint.prizeRep1, sprint.prizeRep2, sprint.prizeRep3][p.position - 1]
-        if (!prize) continue
+    // Pod rep tiers 1-3: the same prize text, paid out in every pod, to
+    // whichever rep holds that rank within their own pod (never against the
+    // other pods in the sprint).
+    const repTiers: [boolean, string][] = [
+      [sprint.podRep1Enabled, sprint.podRep1Prize],
+      [sprint.podRep2Enabled, sprint.podRep2Prize],
+      [sprint.podRep3Enabled, sprint.podRep3Prize],
+    ]
+    for (const pod of sprint.podStandings) {
+      const reps = sprint.repStandingsByPod[pod.teamId] ?? []
+      repTiers.forEach(([enabled, prize], i) => {
+        if (!enabled || !prize) return
+        const rep = reps.find((r) => r.position === i + 1)
+        if (!rep) return
         lines.push({
           source: 'sprint_rep',
           sourceName: sprint.name,
-          personId: p.personId,
-          personName: p.personName,
-          teamName: p.teamName,
+          personId: rep.personId,
+          personName: rep.personName,
+          teamName: pod.teamName,
           prize,
-          status: stillRunning ? 'leading' : 'locked_in',
+          status,
         })
-      }
+      })
+    }
 
-      // The manager prize was collected on the form and printed back on the
-      // card, but — same bug 0017 fixed on the 'perteam' side — never turned
-      // into a PrizeLine, so it never showed up anywhere a person could see
-      // they're owed it. It always belongs to the winning pod specifically
-      // (that's the one thing every one of Cristian's described prize
-      // combinations agrees on), so it rides on the same #1 pod computed
-      // above rather than needing its own lookup.
-      if (sprint.prizeManager && winningTeamId) {
-        for (const mgr of sprint.teamManagers[winningTeamId] ?? []) {
-          const winningTeamName = sprint.teamStandings.find((t) => t.teamId === winningTeamId)?.teamName ?? null
+    // Pod manager: pays every pod's manager(s), unconditionally — not just
+    // the winning pod's. Distinct from "Top pod manager" below.
+    if (sprint.podManagerEnabled && sprint.podManagerPrize) {
+      for (const pod of sprint.podStandings) {
+        pod.managerIds.forEach((managerId, i) => {
           lines.push({
             source: 'sprint_manager',
             sourceName: sprint.name,
-            personId: mgr.personId,
-            personName: mgr.personName,
-            teamName: winningTeamName,
-            prize: sprint.prizeManager,
-            status: stillRunning ? 'leading' : 'locked_in',
+            personId: managerId,
+            personName: pod.managerNames[i] ?? '',
+            teamName: pod.teamName,
+            prize: sprint.podManagerPrize,
+            status,
           })
-        }
+        })
       }
-    } else {
-      // Per pod: every pod races on its own — its own 1st/2nd/3rd rep (2nd and
-      // 3rd are optional) and its own manager prize, independent of how any
-      // other pod in the sprint is doing.
-      for (const teamId of sprint.teamIds) {
-        const tp = sprint.teamPrizes[teamId]
-        if (!tp) continue
-        const teamName = sprint.teamStandings.find((t) => t.teamId === teamId)?.teamName ?? null
+    }
 
-        for (const p of sprint.teamReps[teamId] ?? []) {
-          if (p.position > 3) continue
-          const prize = [tp.c1, tp.c2, tp.c3][p.position - 1]
-          if (!prize) continue
-          lines.push({
-            source: 'sprint_rep',
-            sourceName: sprint.name,
-            personId: p.personId,
-            personName: p.personName,
-            teamName: p.teamName,
-            prize,
-            status: stillRunning ? 'leading' : 'locked_in',
-          })
-        }
-
-        if (tp.mgr) {
-          for (const mgr of sprint.teamManagers[teamId] ?? []) {
-            lines.push({
-              source: 'sprint_manager',
-              sourceName: sprint.name,
-              personId: mgr.personId,
-              personName: mgr.personName,
-              teamName,
-              prize: tp.mgr,
-              status: stillRunning ? 'leading' : 'locked_in',
-            })
-          }
-        }
+    // Top rep, top pod: one prize, to the #1 rep on the #1-ranked pod.
+    if (sprint.topRepTopPodEnabled && sprint.topRepTopPodPrize && topPod) {
+      const topRep = (sprint.repStandingsByPod[topPod.teamId] ?? []).find((r) => r.position === 1)
+      if (topRep) {
+        lines.push({
+          source: 'sprint_rep',
+          sourceName: sprint.name,
+          personId: topRep.personId,
+          personName: topRep.personName,
+          teamName: topPod.teamName,
+          prize: sprint.topRepTopPodPrize,
+          status,
+        })
       }
+    }
+
+    // Top pod manager: one prize, to the #1-ranked pod's manager(s) only.
+    if (sprint.topPodManagerEnabled && sprint.topPodManagerPrize && topPod) {
+      topPod.managerIds.forEach((managerId, i) => {
+        lines.push({
+          source: 'sprint_manager',
+          sourceName: sprint.name,
+          personId: managerId,
+          personName: topPod.managerNames[i] ?? '',
+          teamName: topPod.teamName,
+          prize: sprint.topPodManagerPrize,
+          status,
+        })
+      })
     }
   }
 

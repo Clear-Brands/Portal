@@ -277,12 +277,28 @@ insert into competitions (id, partner_id, team_id, name, start_date, end_date,
    'CS Referral Sprint', pg_temp.shift('2026-08-01'), pg_temp.shift('2026-08-31'),
    '$300', '', '', 1, true);
 
-insert into sprints (id, partner_id, name, start_date, end_date, sprint_type, team_ids,
-                     prize_rep_1, prize_rep_2, prize_manager, visible)
+-- All six prize slots on, to make every one of them demonstrable at once —
+-- see 0020_sprint_prize_slots.sql for what each pays and to whom. end_date
+-- is a target, not a cutoff (closed_at null = still running); left 20 days
+-- out just so the card reads sensibly, not because it cuts anything off.
+insert into sprints (id, partner_id, name, start_date, end_date, team_ids,
+                     pod_rep_1_enabled, pod_rep_1_prize,
+                     pod_rep_2_enabled, pod_rep_2_prize,
+                     pod_rep_3_enabled, pod_rep_3_prize,
+                     pod_manager_enabled, pod_manager_prize,
+                     top_rep_top_pod_enabled, top_rep_top_pod_prize,
+                     top_pod_manager_enabled, top_pod_manager_prize,
+                     visible)
 values (pg_temp.sid('sp1'), pg_temp.sid('p_fp'), 'Summer Showdown',
-        current_date - 20, current_date + 20, 'winner',
+        current_date - 20, current_date + 20,
         array[pg_temp.sid('t_sales'), pg_temp.sid('t_cs')],
-        '$500', '$250', '$300 to the winning pod''s lead', true);
+        true, '$500',
+        true, '$250',
+        true, '$100',
+        true, '$100 to every pod''s manager',
+        true, '$300 bonus',
+        true, '$300 to the winning pod''s lead',
+        true);
 
 -- The original shipped no annual goal. One here makes the feature demonstrable.
 -- Empty team_ids = every pod for the partner (see 0015_closers_club_and_titles.sql).

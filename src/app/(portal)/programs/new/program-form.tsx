@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 
 import { useActionState } from '@/lib/use-resilient-action'
@@ -128,19 +128,44 @@ function CompetitionForm({ teams }: { teams: TeamOption[] }) {
 /* Sprint — pods racing each other                                            */
 /* -------------------------------------------------------------------------- */
 
+/** The six prize slots, in the top-down order the DB check constraint enforces. */
+type SlotKey = 'podRep1' | 'podRep2' | 'podRep3' | 'podManager' | 'topRepTopPod' | 'topPodManager'
+
+const SLOT_FIELD_NAMES: Record<SlotKey, { enabledName: string; prizeName: string }> = {
+  podRep1: { enabledName: 'podRep1Enabled', prizeName: 'podRep1Prize' },
+  podRep2: { enabledName: 'podRep2Enabled', prizeName: 'podRep2Prize' },
+  podRep3: { enabledName: 'podRep3Enabled', prizeName: 'podRep3Prize' },
+  podManager: { enabledName: 'podManagerEnabled', prizeName: 'podManagerPrize' },
+  topRepTopPod: { enabledName: 'topRepTopPodEnabled', prizeName: 'topRepTopPodPrize' },
+  topPodManager: { enabledName: 'topPodManagerEnabled', prizeName: 'topPodManagerPrize' },
+}
+
 function SprintForm({ teams }: { teams: TeamOption[] }) {
   const [state, action, pending] = useActionState(createSprint, initial)
-  const [sprintType, setSprintType] = useState<'winner' | 'perteam'>('winner')
-  const [repPrizeScope, setRepPrizeScope] = useState<'sprint_wide' | 'winning_pod'>('sprint_wide')
   const [selectedTeamIds, setSelectedTeamIds] = useState<string[]>([])
-
-  const selectedTeams = useMemo(
-    () => teams.filter((t) => selectedTeamIds.includes(t.id)),
-    [teams, selectedTeamIds],
-  )
+  const [slots, setSlots] = useState<Record<SlotKey, boolean>>({
+    podRep1: false,
+    podRep2: false,
+    podRep3: false,
+    podManager: false,
+    topRepTopPod: false,
+    topPodManager: false,
+  })
 
   function toggleTeam(id: string) {
     setSelectedTeamIds((prev) => (prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]))
+  }
+
+  /** Turning a tier off cascades to the tiers below it, and the toggle for a
+   *  lower tier is disabled until the one above it is on — the same
+   *  top-down rule `sprints_rep_tiers_top_down` enforces in the database. */
+  function setSlot(key: SlotKey, value: boolean) {
+    setSlots((prev) => {
+      const next = { ...prev, [key]: value }
+      if (key === 'podRep1' && !value) next.podRep2 = false
+      if ((key === 'podRep1' || key === 'podRep2') && !value) next.podRep3 = false
+      return next
+    })
   }
 
   return (
@@ -156,7 +181,7 @@ function SprintForm({ teams }: { teams: TeamOption[] }) {
         <Field label="Starts">
           <input className={inputClass} name="startDate" type="date" required />
         </Field>
-        <Field label="Ends">
+        <Field label="Ends" hint="A target, not a cutoff — standings keep moving until you close the sprint">
           <input className={inputClass} name="endDate" type="date" required />
         </Field>
       </div>
@@ -180,100 +205,59 @@ function SprintForm({ teams }: { teams: TeamOption[] }) {
         </div>
       </Field>
 
-      <Field label="Prize structure">
-        <select
-          className={inputClass}
-          name="sprintType"
-          value={sprintType}
-          onChange={(e) => setSprintType(e.target.value as 'winner' | 'perteam')}
-        >
-          <option value="winner">One ladder for the whole sprint</option>
-          <option value="perteam">A separate prize ladder per pod</option>
-        </select>
-      </Field>
+      <div className="grid gap-3">
+        <p className="font-head text-[11px] tracking-[0.12em] text-muted uppercase">Prizes</p>
+        <p className="text-[12px] text-muted">
+          Toggle on whichever of these six a sprint pays out — everything else stays off. Pod rep
+          tiers pay the same prize in every pod, ranked within that pod alone. Top rep/top pod and
+          Top pod manager each pay exactly one winner, from the #1-ranked pod only.
+        </p>
 
-      {sprintType === 'winner' ? (
-        <>
-          <p className="text-[12px] text-muted">
-            Every prize below is independently optional — leave any of them blank to skip that
-            piece entirely. Want just a manager prize? Leave the pod and rep prizes blank. Want
-            the winning pod&rsquo;s own rep and manager rewarded together? Set the rep scope to
-            &ldquo;Winning pod&rsquo;s own top rep&rdquo; below and fill in both.
-          </p>
-
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="1st pod prize" hint="Optional">
-              <input className={inputClass} name="prizeTeam1" maxLength={160} />
-            </Field>
-            <Field label="2nd pod prize" hint="Optional">
-              <input className={inputClass} name="prizeTeam2" maxLength={160} />
-            </Field>
-            <Field label="3rd pod prize" hint="Optional">
-              <input className={inputClass} name="prizeTeam3" maxLength={160} />
-            </Field>
-          </div>
-
-          <Field label="Rep prize scope">
-            <select
-              className={inputClass}
-              name="repPrizeScope"
-              value={repPrizeScope}
-              onChange={(e) => setRepPrizeScope(e.target.value as 'sprint_wide' | 'winning_pod')}
-            >
-              <option value="sprint_wide">Top individuals across every pod</option>
-              <option value="winning_pod">Just the winning pod&rsquo;s own top rep</option>
-            </select>
-          </Field>
-
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="1st rep prize" hint="Optional">
-              <input className={inputClass} name="prizeRep1" maxLength={160} />
-            </Field>
-            <Field label="2nd rep prize" hint="Optional">
-              <input className={inputClass} name="prizeRep2" maxLength={160} />
-            </Field>
-            <Field label="3rd rep prize" hint="Optional">
-              <input className={inputClass} name="prizeRep3" maxLength={160} />
-            </Field>
-          </div>
-
-          <Field label="Winning pod's manager" hint="Optional — pays whoever manages the #1-ranked pod">
-            <input className={inputClass} name="prizeManager" maxLength={160} placeholder="$300 bonus" />
-          </Field>
-        </>
-      ) : (
-        <div className="grid gap-4">
-          {selectedTeams.length === 0 ? (
-            <p className="text-[13px] text-muted">Pick pods above to set a prize ladder for each.</p>
-          ) : null}
-          {selectedTeams.map((t) => (
-            <div key={t.id} className="rounded-[8px] border border-line bg-surface-2 p-3.5">
-              <p className="mb-1 flex items-center gap-2 font-head text-[12px] tracking-[0.1em] text-paper uppercase">
-                <span aria-hidden className="h-2 w-2 rounded-[2px]" style={{ background: t.color }} />
-                {t.name}
-              </p>
-              <p className="mb-2.5 text-[12px] text-muted">
-                This pod&rsquo;s own top rep, ranked against only this pod&rsquo;s reps — not the
-                other pods in the sprint.
-              </p>
-              <div className="grid gap-3 sm:grid-cols-4">
-                <Field label="1st rep">
-                  <input className={inputClass} name={`teamPrize.${t.id}.c1`} maxLength={160} />
-                </Field>
-                <Field label="2nd rep" hint="Optional">
-                  <input className={inputClass} name={`teamPrize.${t.id}.c2`} maxLength={160} />
-                </Field>
-                <Field label="3rd rep" hint="Optional">
-                  <input className={inputClass} name={`teamPrize.${t.id}.c3`} maxLength={160} />
-                </Field>
-                <Field label="Pod's manager" hint="Optional">
-                  <input className={inputClass} name={`teamPrize.${t.id}.mgr`} maxLength={160} />
-                </Field>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+        <SlotRow
+          slotKey="podRep1"
+          label="1st-place pod rep"
+          hint="Every pod's own top rep"
+          enabled={slots.podRep1}
+          onToggle={(v) => setSlot('podRep1', v)}
+        />
+        <SlotRow
+          slotKey="podRep2"
+          label="2nd-place pod rep"
+          hint="Every pod's own #2 rep"
+          enabled={slots.podRep2}
+          onToggle={(v) => setSlot('podRep2', v)}
+          disabled={!slots.podRep1}
+        />
+        <SlotRow
+          slotKey="podRep3"
+          label="3rd-place pod rep"
+          hint="Every pod's own #3 rep"
+          enabled={slots.podRep3}
+          onToggle={(v) => setSlot('podRep3', v)}
+          disabled={!slots.podRep2}
+        />
+        <SlotRow
+          slotKey="podManager"
+          label="Pod manager"
+          hint="Pays every pod's manager(s) — not just the winner"
+          enabled={slots.podManager}
+          onToggle={(v) => setSlot('podManager', v)}
+        />
+        <SlotRow
+          slotKey="topRepTopPod"
+          label="Top rep, top pod"
+          hint="One winner — the top rep on the #1-ranked pod"
+          enabled={slots.topRepTopPod}
+          onToggle={(v) => setSlot('topRepTopPod', v)}
+        />
+        <SlotRow
+          slotKey="topPodManager"
+          label="Top pod manager"
+          hint="One winner — the #1-ranked pod's manager(s) only"
+          enabled={slots.topPodManager}
+          onToggle={(v) => setSlot('topPodManager', v)}
+        />
+      </div>
 
       <label className="flex items-center gap-2.5 text-[13.5px] text-paper">
         <input type="checkbox" name="visible" defaultChecked className="h-4 w-4" />
@@ -282,6 +266,56 @@ function SprintForm({ teams }: { teams: TeamOption[] }) {
 
       <FormActions pending={pending} label="Add sprint" />
     </form>
+  )
+}
+
+function SlotRow({
+  slotKey,
+  label,
+  hint,
+  enabled,
+  onToggle,
+  disabled = false,
+}: {
+  slotKey: SlotKey
+  label: string
+  hint: string
+  enabled: boolean
+  onToggle: (value: boolean) => void
+  disabled?: boolean
+}) {
+  const { enabledName, prizeName } = SLOT_FIELD_NAMES[slotKey]
+
+  return (
+    <div
+      className={cn(
+        'grid gap-2.5 rounded-[8px] border border-line bg-surface-2 p-3 sm:grid-cols-[220px_1fr] sm:items-center',
+        disabled && 'opacity-50',
+      )}
+    >
+      <label className="flex items-center gap-2.5 text-[13.5px] text-paper">
+        <input
+          type="checkbox"
+          name={enabledName}
+          checked={enabled}
+          disabled={disabled}
+          onChange={(e) => onToggle(e.target.checked)}
+          className="h-4 w-4"
+        />
+        <span>
+          {label}
+          <span className="mt-0.5 block text-[11.5px] text-muted">{hint}</span>
+        </span>
+      </label>
+      <input
+        className={inputClass}
+        name={prizeName}
+        maxLength={160}
+        placeholder="$500, a trip, a watch…"
+        disabled={!enabled}
+        required={enabled}
+      />
+    </div>
   )
 }
 

@@ -24,24 +24,27 @@ export default async function ProgramsPage() {
   const canManage = can(profile, 'programs.write')
   const canApprove = can(profile, 'payouts.write')
 
-  type Card_ = { key: string; startDate: string; endDate: string; node: React.ReactNode }
+  // A competition is "past" once its end date has passed. A sprint's end date
+  // is a target, not a cutoff — it only moves to "past" once an admin has
+  // manually closed it (closeSprint), so the two use different signals here.
+  type Card_ = { key: string; startDate: string; closed: boolean; node: React.ReactNode }
   const cards: Card_[] = [
     ...competitions.map((c) => ({
       key: `competition-${c.id}`,
       startDate: c.startDate,
-      endDate: c.endDate,
+      closed: c.endDate < today,
       node: <CompetitionCard key={c.id} competition={c} today={today} />,
     })),
     ...sprints.map((s) => ({
       key: `sprint-${s.id}`,
       startDate: s.startDate,
-      endDate: s.endDate,
-      node: <SprintCard key={s.id} sprint={s} today={today} />,
+      closed: s.closedAt !== null,
+      node: <SprintCard key={s.id} sprint={s} canManage={canManage} />,
     })),
   ].sort((a, b) => (a.startDate < b.startDate ? 1 : -1))
 
-  const running = cards.filter((c) => c.endDate >= today)
-  const past = cards.filter((c) => c.endDate < today)
+  const running = cards.filter((c) => !c.closed)
+  const past = cards.filter((c) => c.closed)
 
   return (
     <>
