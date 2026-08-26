@@ -136,20 +136,27 @@ export async function transitionDeal(
     return { error: 'Give a reason so the rep can see why the deal was closed out.' }
   }
 
-  const supabase = await createClient()
-  const { error } = await supabase.rpc('transition_deal', {
-    p_deal_id: parsed.data.dealId,
-    p_status: parsed.data.status,
-    p_lost_reason: parsed.data.lostReason,
-  })
+  try {
+    const supabase = await createClient()
+    const { error } = await supabase.rpc('transition_deal', {
+      p_deal_id: parsed.data.dealId,
+      p_status: parsed.data.status,
+      p_lost_reason: parsed.data.lostReason,
+    })
 
-  if (error) return { error: friendly(error.message) }
+    if (error) return { error: friendly(error.message) }
 
-  revalidatePath('/deals')
-  revalidatePath('/deals/pipeline')
-  revalidatePath('/payouts')
-  revalidatePath('/')
-  return { ok: 'Deal updated.' }
+    revalidatePath('/deals')
+    revalidatePath('/deals/pipeline')
+    revalidatePath('/payouts')
+    revalidatePath('/')
+    return { ok: 'Deal updated.' }
+  } catch (err) {
+    // TEMPORARY — diagnosing the "Mark payable" 500. Remove once root-caused.
+    return {
+      error: `DEBUG: ${err instanceof Error ? `${err.message}\n${err.stack}` : String(err)}`,
+    }
+  }
 }
 
 /* -------------------------------------------------------------------------- */
