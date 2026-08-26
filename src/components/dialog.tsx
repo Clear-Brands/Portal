@@ -128,9 +128,14 @@ export function ConfirmDialog({
 }) {
   const [typed, setTyped] = useState('')
 
-  useEffect(() => {
+  // Clears the typed confirmation text once the dialog closes — adjusted
+  // during render rather than in a useEffect, per react-hooks/set-state-in-effect
+  // (see use-close-on-success.ts for the fuller explanation of why).
+  const [wasOpen, setWasOpen] = useState(open)
+  if (open !== wasOpen) {
+    setWasOpen(open)
     if (!open) setTyped('')
-  }, [open])
+  }
 
   const unlocked = !requireTyped || typed.trim() === requireTyped.value.trim()
 

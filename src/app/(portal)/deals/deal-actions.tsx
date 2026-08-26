@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import { useActionState } from '@/lib/use-resilient-action'
+import { useCloseOnSuccess } from '@/lib/use-close-on-success'
 
 import { Button, Pill, fmtMoney } from '@/components/ui'
 import { ConfirmDialog } from '@/components/dialog'
@@ -26,12 +27,10 @@ export function DealActions({ deal, canWrite }: { deal: DealRow; canWrite: boole
   const [lostOpen, setLostOpen] = useState(false)
   const [closeOpen, setCloseOpen] = useState(false)
 
-  useEffect(() => {
-    if (state.ok) {
-      setLostOpen(false)
-      setCloseOpen(false)
-    }
-  }, [state.ok])
+  useCloseOnSuccess(state.ok, () => {
+    setLostOpen(false)
+    setCloseOpen(false)
+  })
 
   if (!canWrite) return null
 

@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import { useActionState } from '@/lib/use-resilient-action'
+import { useCloseOnSuccess } from '@/lib/use-close-on-success'
 import { Button, fmtMoney } from '@/components/ui'
 import { ConfirmDialog } from '@/components/dialog'
 import { recordPayout, voidPayout } from '@/lib/actions/payouts'
@@ -36,9 +37,7 @@ export function RecordPayoutButton({
   const [state, action, pending] = useActionState(recordPayout, initial)
   const [open, setOpen] = useState(false)
 
-  useEffect(() => {
-    if (state.ok) setOpen(false)
-  }, [state.ok])
+  useCloseOnSuccess(state.ok, setOpen)
 
   if (alreadyRecorded) {
     return (
@@ -125,9 +124,7 @@ export function VoidPayoutButton({
   const [state, action, pending] = useActionState(voidPayout, initial)
   const [open, setOpen] = useState(false)
 
-  useEffect(() => {
-    if (state.ok) setOpen(false)
-  }, [state.ok])
+  useCloseOnSuccess(state.ok, setOpen)
 
   return (
     <>
@@ -195,9 +192,7 @@ export function ApproveCompButton({
   const [state, action, pending] = useActionState(approveDealComp, initial)
   const [open, setOpen] = useState(false)
 
-  useEffect(() => {
-    if (state.ok) setOpen(false)
-  }, [state.ok])
+  useCloseOnSuccess(state.ok, setOpen)
 
   return (
     <>

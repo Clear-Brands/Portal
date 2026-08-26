@@ -65,7 +65,7 @@ export default async function PartnerDetailPage({
             {canEditProfile ? (
               <PartnerSettingsForm partner={partner} />
             ) : (
-              <p className="text-[13.5px] text-muted">You cannot edit this partner's settings.</p>
+              <p className="text-[13.5px] text-muted">You cannot edit this partner&rsquo;s settings.</p>
             )}
           </Card>
         </section>
@@ -76,7 +76,7 @@ export default async function PartnerDetailPage({
             {canEditRates ? (
               <PartnerRatesForm partner={partner} />
             ) : (
-              <p className="text-[13.5px] text-muted">You cannot edit this partner's rates.</p>
+              <p className="text-[13.5px] text-muted">You cannot edit this partner&rsquo;s rates.</p>
             )}
           </Card>
         </section>
@@ -88,8 +88,8 @@ export default async function PartnerDetailPage({
           <AdminLogins partnerId={partner.id} logins={logins} canManagePerms={canManagePerms} />
         </Card>
         <p className="mt-2 text-[12.5px] text-muted">
-          Member logins and their permissions are managed from the roster — use "View their
-          roster" above.
+          Member logins and their permissions are managed from the roster — use &ldquo;View their
+          roster&rdquo; above.
         </p>
       </section>
     </>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import { useActionState } from '@/lib/use-resilient-action'
 import { Button, Notice, Pill, cn, fmtCount } from '@/components/ui'
@@ -52,12 +52,15 @@ function Wizard({ onDone }: { onDone: () => void }) {
 
   const preview = previewState.preview
 
-  // A fresh preview defaults to every ready row selected.
-  useEffect(() => {
+  // A fresh preview defaults to every ready row selected. Adjusted during
+  // render rather than in a useEffect — see use-close-on-success.ts for why.
+  const [seenPreview, setSeenPreview] = useState(preview)
+  if (preview !== seenPreview) {
+    setSeenPreview(preview)
     if (preview) {
       setIncluded(new Set(preview.rows.filter((r) => r.status === 'ok').map((r) => r.rowNumber)))
     }
-  }, [preview])
+  }
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]

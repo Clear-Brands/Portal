@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import { useActionState } from '@/lib/use-resilient-action'
+import { useCloseOnSuccess } from '@/lib/use-close-on-success'
 import { Button, fmtCount } from '@/components/ui'
 import { ConfirmDialog } from '@/components/dialog'
 import { approveGoalAward } from '@/lib/actions/programs'
@@ -35,9 +36,7 @@ export function GoalAwardButton({
   const [state, action, pending] = useActionState(approveGoalAward, initial)
   const [open, setOpen] = useState(false)
 
-  useEffect(() => {
-    if (state.ok) setOpen(false)
-  }, [state.ok])
+  useCloseOnSuccess(state.ok, setOpen)
 
   return (
     <>

@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import { useActionState } from '@/lib/use-resilient-action'
+import { useCloseOnSuccess } from '@/lib/use-close-on-success'
 import { Button, Field, Pill, inputClass } from '@/components/ui'
 import { ConfirmDialog } from '@/components/dialog'
 import { PermissionGridButton } from '@/components/permission-grid'
@@ -42,13 +43,9 @@ export function PersonRowActions({
   const [editOpen, setEditOpen] = useState(false)
   const [deactivateOpen, setDeactivateOpen] = useState(false)
 
-  useEffect(() => {
-    if (editState.ok) setEditOpen(false)
-  }, [editState.ok])
+  useCloseOnSuccess(editState.ok, setEditOpen)
 
-  useEffect(() => {
-    if (activeState.ok) setDeactivateOpen(false)
-  }, [activeState.ok])
+  useCloseOnSuccess(activeState.ok, setDeactivateOpen)
 
   if (!canWrite) return null
 

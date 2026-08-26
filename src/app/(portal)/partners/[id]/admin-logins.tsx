@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import { useActionState } from '@/lib/use-resilient-action'
+import { useCloseOnSuccess } from '@/lib/use-close-on-success'
 import { Button, Field, Notice, inputClass } from '@/components/ui'
 import { ConfirmDialog } from '@/components/dialog'
 import { PermissionGridButton } from '@/components/permission-grid'
@@ -62,9 +63,7 @@ function AddAdminButton({ partnerId }: { partnerId: string }) {
   const [state, action, pending] = useActionState(addPartnerAdminLogin, initial)
   const [open, setOpen] = useState(false)
 
-  useEffect(() => {
-    if (state.ok) setOpen(false)
-  }, [state.ok])
+  useCloseOnSuccess(state.ok, setOpen)
 
   return (
     <>

@@ -30,8 +30,8 @@ export default async function ClearBrandsTeamPage() {
           <Eyebrow>Clear Brands</Eyebrow>
           <h1 className="font-head text-[26px] leading-tight text-paper">Team & permissions</h1>
           <p className="mt-1.5 max-w-[62ch] text-[13.5px] text-muted">
-            Admins hold every capability by construction and are not editable here. A manager's
-            checked boxes are what they hold beyond the defaults for "manager" — day-to-day work,
+            Admins hold every capability by construction and are not editable here. A manager&rsquo;s
+            checked boxes are what they hold beyond the defaults for &ldquo;manager&rdquo; — day-to-day work,
             no money writes.
           </p>
         </div>

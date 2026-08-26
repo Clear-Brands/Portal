@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import { useActionState } from '@/lib/use-resilient-action'
+import { useCloseOnSuccess } from '@/lib/use-close-on-success'
 import { Button, Field, Notice, inputClass } from '@/components/ui'
 import { ConfirmDialog } from '@/components/dialog'
 import { addPerson } from '@/lib/actions/roster'
@@ -28,9 +29,7 @@ export function AddPersonButton({
   const [state, action, pending] = useActionState(addPerson, initial)
   const [open, setOpen] = useState(false)
 
-  useEffect(() => {
-    if (state.ok) setOpen(false)
-  }, [state.ok])
+  useCloseOnSuccess(state.ok, setOpen)
 
   return (
     <>

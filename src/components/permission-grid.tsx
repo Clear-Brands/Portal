@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import { useActionState } from '@/lib/use-resilient-action'
+import { useCloseOnSuccess } from '@/lib/use-close-on-success'
 import { Button } from '@/components/ui'
 import { ConfirmDialog } from '@/components/dialog'
 import { updateProfilePerms } from '@/lib/actions/partners'
@@ -55,9 +56,7 @@ export function PermissionGridButton({
   const [open, setOpen] = useState(false)
   const [state, action, pending] = useActionState(updateProfilePerms, initial)
 
-  useEffect(() => {
-    if (state.ok) setOpen(false)
-  }, [state.ok])
+  useCloseOnSuccess(state.ok, setOpen)
 
   const applicable = CAPABILITIES_APPLICABLE_TO[login.role] ?? []
   if (applicable.length === 0) return null

@@ -19,7 +19,7 @@ export default async function NewPartnerPage() {
         <p className="mt-1.5 max-w-[62ch] text-[13.5px] text-muted">
           Creates the partner, its first pod, and sends an admin login invite — all three, so a new
           partner never sits half set up. Rates, feature toggles and additional pods can be edited
-          from the partner's page afterward.
+          from the partner&rsquo;s page afterward.
         </p>
       </div>
 
