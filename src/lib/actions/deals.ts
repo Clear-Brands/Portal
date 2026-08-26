@@ -25,8 +25,6 @@ import { DEAL_STATUSES } from '@/lib/types'
 
 export type ActionState = { error?: string; ok?: string }
 
-const empty: ActionState = {}
-
 /* -------------------------------------------------------------------------- */
 /* Adding a deal                                                               */
 /* -------------------------------------------------------------------------- */
@@ -368,5 +366,3 @@ function friendly(message: string): string {
 
   return 'Something went wrong saving that. Try again, and tell Charles if it keeps happening.'
 }
-
-export { empty as emptyActionState }
