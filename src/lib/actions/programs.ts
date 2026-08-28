@@ -81,18 +81,29 @@ export async function createCompetition(_prev: ActionState, formData: FormData):
 /* Sprints                                                                     */
 /* -------------------------------------------------------------------------- */
 
+/** One prize-text field per pod-finish tier — the pod's own computed rank at
+ *  close-out (1st/2nd/3rd overall), never its name. Shared shape for both
+ *  the rep-tier grid and the pod-manager row below. */
+const PodTierPrizes = z.object({
+  pod1st: z.string().trim().max(160).optional().default(''),
+  pod2nd: z.string().trim().max(160).optional().default(''),
+  pod3rd: z.string().trim().max(160).optional().default(''),
+})
+
 /**
- * Six independent prize slots, each a plain on/off toggle plus its own prize
- * text — no sprint "type" to pick anymore. Cristian's doc: "build prizes as
- * a per-sprint settings screen where the admin toggles each slot on or off."
+ * Six independent prize slots. Cristian's updated doc: rep and pod-manager
+ * prizes are no longer one flat value per slot — each is tiered by where the
+ * POD finishes overall, on top of the existing on/off toggle. "1st place in
+ * the winning pod" can pay more than "1st place in the 3rd-place pod."
  *
- *   podRep1/2/3   — per-pod rep tiers, same prize text in every pod. Top-down
- *                   only: 2 needs 1 on, 3 needs 2 on (mirrors the DB check
- *                   `sprints_rep_tiers_top_down` — enforced here too so the
- *                   form never round-trips to the server to find out).
- *   podManager    — pays every pod's manager(s), unconditionally.
- *   topRepTopPod  — one prize, to the top rep on the #1-ranked pod.
- *   topPodManager — one prize, to the #1-ranked pod's manager(s) only.
+ *   podRep1/2/3   — per-pod rep tiers. Still a single on/off toggle across
+ *                   every pod (top-down only: 2 needs 1 on, 3 needs 2 on —
+ *                   mirrors the DB check `sprints_rep_tiers_top_down`), but
+ *                   now carries three prize values, one per pod-finish tier.
+ *   podManager    — pays every pod's manager(s); also tiered by pod finish.
+ *   topRepTopPod  — one prize, to the top rep on the #1-ranked pod. Only
+ *                   ever the winning pod, so nothing to tier — unchanged.
+ *   topPodManager — one prize, to the #1-ranked pod's manager(s). Unchanged.
  */
 const SprintSchema = z
   .object({
@@ -101,13 +112,13 @@ const SprintSchema = z
     endDate: z.iso.date('Enter a valid end date'),
     teamIds: z.array(z.guid()).min(2, 'A sprint needs at least two pods'),
     podRep1Enabled: z.string().optional(),
-    podRep1Prize: z.string().trim().max(160).optional().default(''),
+    podRep1Prize: PodTierPrizes,
     podRep2Enabled: z.string().optional(),
-    podRep2Prize: z.string().trim().max(160).optional().default(''),
+    podRep2Prize: PodTierPrizes,
     podRep3Enabled: z.string().optional(),
-    podRep3Prize: z.string().trim().max(160).optional().default(''),
+    podRep3Prize: PodTierPrizes,
     podManagerEnabled: z.string().optional(),
-    podManagerPrize: z.string().trim().max(160).optional().default(''),
+    podManagerPrize: PodTierPrizes,
     topRepTopPodEnabled: z.string().optional(),
     topRepTopPodPrize: z.string().trim().max(160).optional().default(''),
     topPodManagerEnabled: z.string().optional(),
@@ -126,20 +137,20 @@ const SprintSchema = z
     message: 'Turn on the 2nd-place pod rep prize before the 3rd',
     path: ['podRep3Enabled'],
   })
-  .refine((d) => d.podRep1Enabled !== 'on' || d.podRep1Prize !== '', {
-    message: 'Give the 1st-place pod rep prize a description',
+  .refine((d) => d.podRep1Enabled !== 'on' || Object.values(d.podRep1Prize).every(Boolean), {
+    message: 'Fill in all three tiers of the 1st-place pod rep prize',
     path: ['podRep1Prize'],
   })
-  .refine((d) => d.podRep2Enabled !== 'on' || d.podRep2Prize !== '', {
-    message: 'Give the 2nd-place pod rep prize a description',
+  .refine((d) => d.podRep2Enabled !== 'on' || Object.values(d.podRep2Prize).every(Boolean), {
+    message: 'Fill in all three tiers of the 2nd-place pod rep prize',
     path: ['podRep2Prize'],
   })
-  .refine((d) => d.podRep3Enabled !== 'on' || d.podRep3Prize !== '', {
-    message: 'Give the 3rd-place pod rep prize a description',
+  .refine((d) => d.podRep3Enabled !== 'on' || Object.values(d.podRep3Prize).every(Boolean), {
+    message: 'Fill in all three tiers of the 3rd-place pod rep prize',
     path: ['podRep3Prize'],
   })
-  .refine((d) => d.podManagerEnabled !== 'on' || d.podManagerPrize !== '', {
-    message: 'Give the pod manager prize a description',
+  .refine((d) => d.podManagerEnabled !== 'on' || Object.values(d.podManagerPrize).every(Boolean), {
+    message: 'Fill in all three tiers of the pod manager prize',
     path: ['podManagerPrize'],
   })
   .refine((d) => d.topRepTopPodEnabled !== 'on' || d.topRepTopPodPrize !== '', {
@@ -150,6 +161,17 @@ const SprintSchema = z
     message: 'Give the top pod manager prize a description',
     path: ['topPodManagerPrize'],
   })
+
+/** Pulls `<field>.pod1st` / `.pod2nd` / `.pod3rd` out of the raw form into a
+ *  nested object per tiered slot — same trick as the old teamPrize.<id>.<field>
+ *  collector, just with a fixed set of keys instead of one per pod id. */
+function collectPodTierPrizes(formData: FormData, field: string) {
+  return {
+    pod1st: String(formData.get(`${field}.pod1st`) ?? ''),
+    pod2nd: String(formData.get(`${field}.pod2nd`) ?? ''),
+    pod3rd: String(formData.get(`${field}.pod3rd`) ?? ''),
+  }
+}
 
 export async function createSprint(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const profile = await requireSession()
@@ -162,8 +184,19 @@ export async function createSprint(_prev: ActionState, formData: FormData): Prom
 
   const raw = Object.fromEntries(formData)
   const teamIds = formData.getAll('teamIds').map(String)
+  const podRep1Prize = collectPodTierPrizes(formData, 'podRep1Prize')
+  const podRep2Prize = collectPodTierPrizes(formData, 'podRep2Prize')
+  const podRep3Prize = collectPodTierPrizes(formData, 'podRep3Prize')
+  const podManagerPrize = collectPodTierPrizes(formData, 'podManagerPrize')
 
-  const parsed = SprintSchema.safeParse({ ...raw, teamIds })
+  const parsed = SprintSchema.safeParse({
+    ...raw,
+    teamIds,
+    podRep1Prize,
+    podRep2Prize,
+    podRep3Prize,
+    podManagerPrize,
+  })
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Check the form and try again.' }
   }
@@ -178,13 +211,21 @@ export async function createSprint(_prev: ActionState, formData: FormData): Prom
     end_date: input.endDate,
     team_ids: input.teamIds,
     pod_rep_1_enabled: input.podRep1Enabled === 'on',
-    pod_rep_1_prize: input.podRep1Prize,
+    pod_rep_1_prize_pod_1st: input.podRep1Prize.pod1st,
+    pod_rep_1_prize_pod_2nd: input.podRep1Prize.pod2nd,
+    pod_rep_1_prize_pod_3rd: input.podRep1Prize.pod3rd,
     pod_rep_2_enabled: input.podRep2Enabled === 'on',
-    pod_rep_2_prize: input.podRep2Prize,
+    pod_rep_2_prize_pod_1st: input.podRep2Prize.pod1st,
+    pod_rep_2_prize_pod_2nd: input.podRep2Prize.pod2nd,
+    pod_rep_2_prize_pod_3rd: input.podRep2Prize.pod3rd,
     pod_rep_3_enabled: input.podRep3Enabled === 'on',
-    pod_rep_3_prize: input.podRep3Prize,
+    pod_rep_3_prize_pod_1st: input.podRep3Prize.pod1st,
+    pod_rep_3_prize_pod_2nd: input.podRep3Prize.pod2nd,
+    pod_rep_3_prize_pod_3rd: input.podRep3Prize.pod3rd,
     pod_manager_enabled: input.podManagerEnabled === 'on',
-    pod_manager_prize: input.podManagerPrize,
+    pod_manager_prize_pod_1st: input.podManagerPrize.pod1st,
+    pod_manager_prize_pod_2nd: input.podManagerPrize.pod2nd,
+    pod_manager_prize_pod_3rd: input.podManagerPrize.pod3rd,
     top_rep_top_pod_enabled: input.topRepTopPodEnabled === 'on',
     top_rep_top_pod_prize: input.topRepTopPodPrize,
     top_pod_manager_enabled: input.topPodManagerEnabled === 'on',

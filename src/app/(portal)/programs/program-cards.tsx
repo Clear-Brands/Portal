@@ -1,5 +1,5 @@
 import { Card, Pill, fmtCount, fmtDate, fmtMoney } from '@/components/ui'
-import type { Competition, Sprint } from '@/lib/data/programs'
+import { tierPrize, type Competition, type PodTierPrizes, type Sprint } from '@/lib/data/programs'
 import { CloseSprintButton, ReopenSprintButton } from './sprint-controls'
 
 /**
@@ -85,17 +85,28 @@ export function CompetitionCard({ competition, today }: { competition: Competiti
   )
 }
 
-/** The prize(s) a given rep earns — their pod-rank tier, plus the sprint-wide
- *  "top rep, top pod" prize if they also happen to hold #1 on the #1 pod. */
+/** The prize(s) a given rep earns — their pod's tier value for that rep-rank,
+ *  plus the sprint-wide "top rep, top pod" prize if they also happen to hold
+ *  #1 on the #1 pod. */
 function repPrizes(sprint: Sprint, podPosition: number, repPosition: number): string[] {
   const tierEnabled = [sprint.podRep1Enabled, sprint.podRep2Enabled, sprint.podRep3Enabled][repPosition - 1]
-  const tierPrize = [sprint.podRep1Prize, sprint.podRep2Prize, sprint.podRep3Prize][repPosition - 1]
+  const tierPrizes = [sprint.podRep1Prize, sprint.podRep2Prize, sprint.podRep3Prize][repPosition - 1]
   const prizes: string[] = []
-  if (tierEnabled && tierPrize) prizes.push(tierPrize)
+  const prize = tierEnabled && tierPrizes ? tierPrize(tierPrizes, podPosition) : undefined
+  if (prize) prizes.push(prize)
   if (sprint.topRepTopPodEnabled && sprint.topRepTopPodPrize && podPosition === 1 && repPosition === 1) {
     prizes.push(sprint.topRepTopPodPrize)
   }
   return prizes
+}
+
+/** A tiered slot's three values as one compact string for the summary line
+ *  — e.g. "$500 / $300 / $100", or just "$500" when all three match (a flat
+ *  prize entered the same way across the row). Blank tiers show as "—". */
+function tierSummary(prizes: PodTierPrizes): string {
+  const { pod1st, pod2nd, pod3rd } = prizes
+  if (pod1st === pod2nd && pod2nd === pod3rd) return pod1st || '—'
+  return [pod1st, pod2nd, pod3rd].map((v) => v || '—').join(' / ')
 }
 
 export function SprintCard({ sprint, canManage }: { sprint: Sprint; canManage: boolean }) {
@@ -103,10 +114,10 @@ export function SprintCard({ sprint, canManage }: { sprint: Sprint; canManage: b
   const topPod = sprint.podStandings.find((p) => p.position === 1) ?? null
 
   const activeSlots = [
-    sprint.podRep1Enabled && sprint.podRep1Prize ? `1st pod rep — ${sprint.podRep1Prize}` : null,
-    sprint.podRep2Enabled && sprint.podRep2Prize ? `2nd pod rep — ${sprint.podRep2Prize}` : null,
-    sprint.podRep3Enabled && sprint.podRep3Prize ? `3rd pod rep — ${sprint.podRep3Prize}` : null,
-    sprint.podManagerEnabled && sprint.podManagerPrize ? `Pod manager — ${sprint.podManagerPrize}` : null,
+    sprint.podRep1Enabled ? `1st pod rep — ${tierSummary(sprint.podRep1Prize)}` : null,
+    sprint.podRep2Enabled ? `2nd pod rep — ${tierSummary(sprint.podRep2Prize)}` : null,
+    sprint.podRep3Enabled ? `3rd pod rep — ${tierSummary(sprint.podRep3Prize)}` : null,
+    sprint.podManagerEnabled ? `Pod manager — ${tierSummary(sprint.podManagerPrize)}` : null,
     sprint.topRepTopPodEnabled && sprint.topRepTopPodPrize ? `Top rep, top pod — ${sprint.topRepTopPodPrize}` : null,
     sprint.topPodManagerEnabled && sprint.topPodManagerPrize ? `Top pod manager — ${sprint.topPodManagerPrize}` : null,
   ].filter((s): s is string => Boolean(s))
@@ -147,10 +158,9 @@ export function SprintCard({ sprint, canManage }: { sprint: Sprint; canManage: b
         {sprint.podStandings.map((pod) => {
           const reps = sprint.repStandingsByPod[pod.teamId] ?? []
           const isTopPod = pod.position === 1
+          const podManagerPrize = sprint.podManagerEnabled ? tierPrize(sprint.podManagerPrize, pod.position) : undefined
           const managerLines = [
-            sprint.podManagerEnabled && sprint.podManagerPrize
-              ? { prize: sprint.podManagerPrize, label: 'Pod manager' }
-              : null,
+            podManagerPrize ? { prize: podManagerPrize, label: 'Pod manager' } : null,
             isTopPod && sprint.topPodManagerEnabled && sprint.topPodManagerPrize
               ? { prize: sprint.topPodManagerPrize, label: 'Top pod manager' }
               : null,

@@ -148,11 +148,32 @@ export interface SprintRepStanding {
   isClosed: boolean
 }
 
+/** One prize value per pod-finish tier — the pod's own computed `position`
+ *  at close-out (1st/2nd/3rd overall), never its name or team_id. Shared by
+ *  the rep-tier grid and the pod-manager row. */
+export interface PodTierPrizes {
+  pod1st: string
+  pod2nd: string
+  pod3rd: string
+}
+
+/** The prize text for a pod finishing at `position`, or undefined for a pod
+ *  finishing 4th or lower — the grid only defines three tiers. Exported so
+ *  the leaderboard card can resolve the same tier a rep or manager's own
+ *  pod earned, without duplicating the lookup. */
+export function tierPrize(prizes: PodTierPrizes, position: number): string | undefined {
+  if (position === 1) return prizes.pod1st || undefined
+  if (position === 2) return prizes.pod2nd || undefined
+  if (position === 3) return prizes.pod3rd || undefined
+  return undefined
+}
+
 /**
  * Six independent prize slots — see the schema comment on `SprintSchema` in
- * actions/programs.ts. Each `*Enabled` flag has a matching `*Prize` string;
- * a slot with no prize text set is still "enabled" until the admin fills one
- * in, so callers should treat `enabled && prize` as "actually pays out."
+ * actions/programs.ts. The four per-pod slots (podRep1/2/3, podManager) are
+ * tiered by pod finish: `*Prize` holds a value per pod-rank (1st/2nd/3rd
+ * overall), not one flat value. The two cross-pod slots (topRepTopPod,
+ * topPodManager) only ever pay the #1 pod, so they stay a single string.
  */
 export interface Sprint {
   id: string
@@ -162,13 +183,13 @@ export interface Sprint {
   endDate: string
   teamIds: string[]
   podRep1Enabled: boolean
-  podRep1Prize: string
+  podRep1Prize: PodTierPrizes
   podRep2Enabled: boolean
-  podRep2Prize: string
+  podRep2Prize: PodTierPrizes
   podRep3Enabled: boolean
-  podRep3Prize: string
+  podRep3Prize: PodTierPrizes
   podManagerEnabled: boolean
-  podManagerPrize: string
+  podManagerPrize: PodTierPrizes
   topRepTopPodEnabled: boolean
   topRepTopPodPrize: string
   topPodManagerEnabled: boolean
@@ -249,13 +270,29 @@ export async function listSprints(): Promise<Sprint[]> {
     endDate: row.end_date as string,
     teamIds: (row.team_ids as string[]) ?? [],
     podRep1Enabled: Boolean(row.pod_rep_1_enabled),
-    podRep1Prize: (row.pod_rep_1_prize as string) ?? '',
+    podRep1Prize: {
+      pod1st: (row.pod_rep_1_prize_pod_1st as string) ?? '',
+      pod2nd: (row.pod_rep_1_prize_pod_2nd as string) ?? '',
+      pod3rd: (row.pod_rep_1_prize_pod_3rd as string) ?? '',
+    },
     podRep2Enabled: Boolean(row.pod_rep_2_enabled),
-    podRep2Prize: (row.pod_rep_2_prize as string) ?? '',
+    podRep2Prize: {
+      pod1st: (row.pod_rep_2_prize_pod_1st as string) ?? '',
+      pod2nd: (row.pod_rep_2_prize_pod_2nd as string) ?? '',
+      pod3rd: (row.pod_rep_2_prize_pod_3rd as string) ?? '',
+    },
     podRep3Enabled: Boolean(row.pod_rep_3_enabled),
-    podRep3Prize: (row.pod_rep_3_prize as string) ?? '',
+    podRep3Prize: {
+      pod1st: (row.pod_rep_3_prize_pod_1st as string) ?? '',
+      pod2nd: (row.pod_rep_3_prize_pod_2nd as string) ?? '',
+      pod3rd: (row.pod_rep_3_prize_pod_3rd as string) ?? '',
+    },
     podManagerEnabled: Boolean(row.pod_manager_enabled),
-    podManagerPrize: (row.pod_manager_prize as string) ?? '',
+    podManagerPrize: {
+      pod1st: (row.pod_manager_prize_pod_1st as string) ?? '',
+      pod2nd: (row.pod_manager_prize_pod_2nd as string) ?? '',
+      pod3rd: (row.pod_manager_prize_pod_3rd as string) ?? '',
+    },
     topRepTopPodEnabled: Boolean(row.top_rep_top_pod_enabled),
     topRepTopPodPrize: (row.top_rep_top_pod_prize as string) ?? '',
     topPodManagerEnabled: Boolean(row.top_pod_manager_enabled),
@@ -415,18 +452,24 @@ export async function listPrizeLines(): Promise<PrizeLine[]> {
     const status = stillRunning ? 'leading' : 'locked_in'
     const topPod = sprint.podStandings.find((p) => p.position === 1) ?? null
 
-    // Pod rep tiers 1-3: the same prize text, paid out in every pod, to
-    // whichever rep holds that rank within their own pod (never against the
-    // other pods in the sprint).
-    const repTiers: [boolean, string][] = [
+    // Pod rep tiers 1-3: paid out in every pod, to whichever rep holds that
+    // rank within their own pod (never against the other pods in the
+    // sprint) — but the prize VALUE now depends on where that rep's pod
+    // finished overall (1st/2nd/3rd), so a rep's own #1 finish is worth more
+    // when their pod also won than when it came in 3rd. A pod finishing 4th
+    // or lower (more than three pods in the sprint) earns nothing from
+    // these tiers — the grid only defines three columns.
+    const repTiers: [boolean, PodTierPrizes][] = [
       [sprint.podRep1Enabled, sprint.podRep1Prize],
       [sprint.podRep2Enabled, sprint.podRep2Prize],
       [sprint.podRep3Enabled, sprint.podRep3Prize],
     ]
     for (const pod of sprint.podStandings) {
       const reps = sprint.repStandingsByPod[pod.teamId] ?? []
-      repTiers.forEach(([enabled, prize], i) => {
-        if (!enabled || !prize) return
+      repTiers.forEach(([enabled, prizes], i) => {
+        if (!enabled) return
+        const prize = tierPrize(prizes, pod.position)
+        if (!prize) return
         const rep = reps.find((r) => r.position === i + 1)
         if (!rep) return
         lines.push({
@@ -442,9 +485,12 @@ export async function listPrizeLines(): Promise<PrizeLine[]> {
     }
 
     // Pod manager: pays every pod's manager(s), unconditionally — not just
-    // the winning pod's. Distinct from "Top pod manager" below.
-    if (sprint.podManagerEnabled && sprint.podManagerPrize) {
+    // the winning pod's — also tiered by that pod's overall finish. Distinct
+    // from "Top pod manager" below, which only ever pays the #1 pod.
+    if (sprint.podManagerEnabled) {
       for (const pod of sprint.podStandings) {
+        const prize = tierPrize(sprint.podManagerPrize, pod.position)
+        if (!prize) continue
         pod.managerIds.forEach((managerId, i) => {
           lines.push({
             source: 'sprint_manager',
@@ -452,7 +498,7 @@ export async function listPrizeLines(): Promise<PrizeLine[]> {
             personId: managerId,
             personName: pod.managerNames[i] ?? '',
             teamName: pod.teamName,
-            prize: sprint.podManagerPrize,
+            prize,
             status,
           })
         })

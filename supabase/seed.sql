@@ -281,21 +281,25 @@ insert into competitions (id, partner_id, team_id, name, start_date, end_date,
 -- see 0020_sprint_prize_slots.sql for what each pays and to whom. end_date
 -- is a target, not a cutoff (closed_at null = still running); left 20 days
 -- out just so the card reads sensibly, not because it cuts anything off.
+-- Rep and pod-manager prizes are tiered by pod finish (winning / 2nd / 3rd
+-- place pod) — see 0022_sprint_prize_tiers.sql. Genuinely different values
+-- per tier here, rather than the same amount in all three columns, so the
+-- demo actually shows the tiering rather than looking like a flat prize.
 insert into sprints (id, partner_id, name, start_date, end_date, team_ids,
-                     pod_rep_1_enabled, pod_rep_1_prize,
-                     pod_rep_2_enabled, pod_rep_2_prize,
-                     pod_rep_3_enabled, pod_rep_3_prize,
-                     pod_manager_enabled, pod_manager_prize,
+                     pod_rep_1_enabled, pod_rep_1_prize_pod_1st, pod_rep_1_prize_pod_2nd, pod_rep_1_prize_pod_3rd,
+                     pod_rep_2_enabled, pod_rep_2_prize_pod_1st, pod_rep_2_prize_pod_2nd, pod_rep_2_prize_pod_3rd,
+                     pod_rep_3_enabled, pod_rep_3_prize_pod_1st, pod_rep_3_prize_pod_2nd, pod_rep_3_prize_pod_3rd,
+                     pod_manager_enabled, pod_manager_prize_pod_1st, pod_manager_prize_pod_2nd, pod_manager_prize_pod_3rd,
                      top_rep_top_pod_enabled, top_rep_top_pod_prize,
                      top_pod_manager_enabled, top_pod_manager_prize,
                      visible)
 values (pg_temp.sid('sp1'), pg_temp.sid('p_fp'), 'Summer Showdown',
         current_date - 20, current_date + 20,
         array[pg_temp.sid('t_sales'), pg_temp.sid('t_cs')],
-        true, '$500',
-        true, '$250',
-        true, '$100',
-        true, '$100 to every pod''s manager',
+        true, '$500', '$350', '$200',
+        true, '$250', '$150', '$100',
+        true, '$100', '$75', '$50',
+        true, '$150 to every pod''s manager', '$100 to every pod''s manager', '$50 to every pod''s manager',
         true, '$300 bonus',
         true, '$300 to the winning pod''s lead',
         true);

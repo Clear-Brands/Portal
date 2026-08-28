@@ -128,17 +128,26 @@ function CompetitionForm({ teams }: { teams: TeamOption[] }) {
 /* Sprint — pods racing each other                                            */
 /* -------------------------------------------------------------------------- */
 
-/** The six prize slots, in the top-down order the DB check constraint enforces. */
-type SlotKey = 'podRep1' | 'podRep2' | 'podRep3' | 'podManager' | 'topRepTopPod' | 'topPodManager'
+/** The four per-pod slots — tiered by pod finish, a rep-place row or the
+ *  manager row, each with three prize values (winning / 2nd / 3rd pod). */
+type TieredSlotKey = 'podRep1' | 'podRep2' | 'podRep3' | 'podManager'
 
-const SLOT_FIELD_NAMES: Record<SlotKey, { enabledName: string; prizeName: string }> = {
+const TIERED_SLOT_FIELD_NAMES: Record<TieredSlotKey, { enabledName: string; prizeName: string }> = {
   podRep1: { enabledName: 'podRep1Enabled', prizeName: 'podRep1Prize' },
   podRep2: { enabledName: 'podRep2Enabled', prizeName: 'podRep2Prize' },
   podRep3: { enabledName: 'podRep3Enabled', prizeName: 'podRep3Prize' },
   podManager: { enabledName: 'podManagerEnabled', prizeName: 'podManagerPrize' },
+}
+
+/** The two cross-pod slots — a single winner, so a single toggle + prize text. */
+type SingleSlotKey = 'topRepTopPod' | 'topPodManager'
+
+const SINGLE_SLOT_FIELD_NAMES: Record<SingleSlotKey, { enabledName: string; prizeName: string }> = {
   topRepTopPod: { enabledName: 'topRepTopPodEnabled', prizeName: 'topRepTopPodPrize' },
   topPodManager: { enabledName: 'topPodManagerEnabled', prizeName: 'topPodManagerPrize' },
 }
+
+type SlotKey = TieredSlotKey | SingleSlotKey
 
 function SprintForm({ teams }: { teams: TeamOption[] }) {
   const [state, action, pending] = useActionState(createSprint, initial)
@@ -208,19 +217,21 @@ function SprintForm({ teams }: { teams: TeamOption[] }) {
       <div className="grid gap-3">
         <p className="font-head text-[11px] tracking-[0.12em] text-muted uppercase">Prizes</p>
         <p className="text-[12px] text-muted">
-          Toggle on whichever of these six a sprint pays out — everything else stays off. Pod rep
-          tiers pay the same prize in every pod, ranked within that pod alone. Top rep/top pod and
-          Top pod manager each pay exactly one winner, from the #1-ranked pod only.
+          Toggle on whichever of these a sprint pays out — everything else stays off. Pod rep
+          tiers and the pod manager prize pay in every pod, but the amount depends on where that
+          pod finishes overall — enter the same value in all three columns for a flat prize
+          instead. Top rep/top pod and Top pod manager each pay exactly one winner, from the
+          #1-ranked pod only, so there&rsquo;s nothing to tier.
         </p>
 
-        <SlotRow
+        <TieredSlotRow
           slotKey="podRep1"
           label="1st-place pod rep"
           hint="Every pod's own top rep"
           enabled={slots.podRep1}
           onToggle={(v) => setSlot('podRep1', v)}
         />
-        <SlotRow
+        <TieredSlotRow
           slotKey="podRep2"
           label="2nd-place pod rep"
           hint="Every pod's own #2 rep"
@@ -228,7 +239,7 @@ function SprintForm({ teams }: { teams: TeamOption[] }) {
           onToggle={(v) => setSlot('podRep2', v)}
           disabled={!slots.podRep1}
         />
-        <SlotRow
+        <TieredSlotRow
           slotKey="podRep3"
           label="3rd-place pod rep"
           hint="Every pod's own #3 rep"
@@ -236,7 +247,7 @@ function SprintForm({ teams }: { teams: TeamOption[] }) {
           onToggle={(v) => setSlot('podRep3', v)}
           disabled={!slots.podRep2}
         />
-        <SlotRow
+        <TieredSlotRow
           slotKey="podManager"
           label="Pod manager"
           hint="Pays every pod's manager(s) — not just the winner"
@@ -269,36 +280,30 @@ function SprintForm({ teams }: { teams: TeamOption[] }) {
   )
 }
 
+/** The two cross-pod slots — a single toggle + a single prize text, since
+ *  they only ever pay one winner from the #1-ranked pod. */
 function SlotRow({
   slotKey,
   label,
   hint,
   enabled,
   onToggle,
-  disabled = false,
 }: {
-  slotKey: SlotKey
+  slotKey: SingleSlotKey
   label: string
   hint: string
   enabled: boolean
   onToggle: (value: boolean) => void
-  disabled?: boolean
 }) {
-  const { enabledName, prizeName } = SLOT_FIELD_NAMES[slotKey]
+  const { enabledName, prizeName } = SINGLE_SLOT_FIELD_NAMES[slotKey]
 
   return (
-    <div
-      className={cn(
-        'grid gap-2.5 rounded-[8px] border border-line bg-surface-2 p-3 sm:grid-cols-[220px_1fr] sm:items-center',
-        disabled && 'opacity-50',
-      )}
-    >
+    <div className="grid gap-2.5 rounded-[8px] border border-line bg-surface-2 p-3 sm:grid-cols-[220px_1fr] sm:items-center">
       <label className="flex items-center gap-2.5 text-[13.5px] text-paper">
         <input
           type="checkbox"
           name={enabledName}
           checked={enabled}
-          disabled={disabled}
           onChange={(e) => onToggle(e.target.checked)}
           className="h-4 w-4"
         />
@@ -316,6 +321,68 @@ function SlotRow({
         required={enabled}
       />
     </div>
+  )
+}
+
+/** One of the four per-pod slots — an enable toggle plus a 3-column grid of
+ *  prize inputs, one per pod-finish tier (winning / 2nd / 3rd place pod). */
+function TieredSlotRow({
+  slotKey,
+  label,
+  hint,
+  enabled,
+  onToggle,
+  disabled = false,
+}: {
+  slotKey: TieredSlotKey
+  label: string
+  hint: string
+  enabled: boolean
+  onToggle: (value: boolean) => void
+  disabled?: boolean
+}) {
+  const { enabledName, prizeName } = TIERED_SLOT_FIELD_NAMES[slotKey]
+
+  return (
+    <div
+      className={cn('grid gap-3 rounded-[8px] border border-line bg-surface-2 p-3', disabled && 'opacity-50')}
+    >
+      <label className="flex items-center gap-2.5 text-[13.5px] text-paper">
+        <input
+          type="checkbox"
+          name={enabledName}
+          checked={enabled}
+          disabled={disabled}
+          onChange={(e) => onToggle(e.target.checked)}
+          className="h-4 w-4"
+        />
+        <span>
+          {label}
+          <span className="mt-0.5 block text-[11.5px] text-muted">{hint}</span>
+        </span>
+      </label>
+      <div className="grid gap-2.5 sm:grid-cols-3">
+        <TierInput label="Winning pod" name={`${prizeName}.pod1st`} enabled={enabled} />
+        <TierInput label="2nd place pod" name={`${prizeName}.pod2nd`} enabled={enabled} />
+        <TierInput label="3rd place pod" name={`${prizeName}.pod3rd`} enabled={enabled} />
+      </div>
+    </div>
+  )
+}
+
+function TierInput({ label, name, enabled }: { label: string; name: string; enabled: boolean }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-[11.5px] text-muted">{label}</span>
+      <input
+        className={inputClass}
+        name={name}
+        maxLength={160}
+        placeholder="$500, a trip, a watch…"
+        disabled={!enabled}
+        required={enabled}
+      />
+    </label>
   )
 }
 
