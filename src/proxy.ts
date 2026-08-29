@@ -23,6 +23,16 @@ import { NextResponse, type NextRequest } from 'next/server'
 // set to POST, because the request never reached the webhook route at all.
 const PUBLIC_PATHS = ['/login', '/auth/callback', '/not-on-roster', '/access-paused', '/api/webhooks']
 
+// getUser() below makes a real network call to Supabase's auth server, on
+// almost every request to the site (see the matcher). A slow or hung
+// connection there used to hang this proxy until Netlify's own edge runtime
+// killed it — which is what a visitor sees as "This edge function has
+// crashed / the edge function timed out", for every route, until it clears.
+// Racing the call against a timeout means a Supabase hiccup degrades to
+// "please sign in again" for that one request instead of taking the whole
+// portal down.
+const AUTH_CHECK_TIMEOUT_MS = 6000
+
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })
 
@@ -48,10 +58,13 @@ export async function proxy(request: NextRequest) {
   )
 
   // getUser(), not getSession(): this revalidates the token with the auth server
-  // rather than trusting a cookie the browser handed us.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // rather than trusting a cookie the browser handed us. Bounded so a stalled
+  // call fails safe (treated as signed-out for this one request) instead of
+  // hanging the whole function.
+  const user = await Promise.race([
+    supabase.auth.getUser().then(({ data }) => data.user),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), AUTH_CHECK_TIMEOUT_MS)),
+  ]).catch(() => null)
 
   const { pathname } = request.nextUrl
   const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
