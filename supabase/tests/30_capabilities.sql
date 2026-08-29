@@ -22,7 +22,8 @@ declare
   v_all text[] := array[
     'deals.write','people.write','programs.write','partners.write','rates.write',
     'payouts.write','payouts.view','revshare.write','revshare.view',
-    'activity.view','exports.run','spiffs.view','competitions.view','podium.view'
+    'activity.view','exports.run','spiffs.view','competitions.view','podium.view',
+    'assets.write','assets.view'
   ];
   k text;
 begin
@@ -49,22 +50,29 @@ begin
   -- defaulted view_revshare on for managers while the SQL policy left rev share
   -- readable unconditionally, so "hiding" it hid nothing.
   perform pg_temp.ok('internal manager: NOT revshare.view', not public.capability_default('internal','manager','revshare.view'));
+  -- assets.write follows rates.write/partners.write exactly: admin by
+  -- default, never manager, always overridable per login from the grid.
+  perform pg_temp.ok('internal manager: NOT assets.write',  not public.capability_default('internal','manager','assets.write'));
 
   -- Partner admins: their own organisation, money read-only.
   perform pg_temp.ok('partner admin: payouts.view',        public.capability_default('partner_admin','none','payouts.view'));
   perform pg_temp.ok('partner admin: revshare.view',       public.capability_default('partner_admin','none','revshare.view'));
   perform pg_temp.ok('partner admin: people.write',        public.capability_default('partner_admin','none','people.write'));
+  perform pg_temp.ok('partner admin: assets.view',         public.capability_default('partner_admin','none','assets.view'));
   perform pg_temp.ok('partner admin: NOT payouts.write',   not public.capability_default('partner_admin','none','payouts.write'));
   perform pg_temp.ok('partner admin: NOT rates.write',     not public.capability_default('partner_admin','none','rates.write'));
   perform pg_temp.ok('partner admin: NOT activity.view',   not public.capability_default('partner_admin','none','activity.view'));
+  perform pg_temp.ok('partner admin: NOT assets.write',    not public.capability_default('partner_admin','none','assets.write'));
 
   -- Members see their own numbers and nothing structural.
   perform pg_temp.ok('member: spiffs.view',                public.capability_default('member','none','spiffs.view'));
   perform pg_temp.ok('member: competitions.view',          public.capability_default('member','none','competitions.view'));
   perform pg_temp.ok('member: podium.view',                public.capability_default('member','none','podium.view'));
+  perform pg_temp.ok('member: assets.view',                public.capability_default('member','none','assets.view'));
   perform pg_temp.ok('member: NOT deals.write',            not public.capability_default('member','none','deals.write'));
   perform pg_temp.ok('member: NOT people.write',           not public.capability_default('member','none','people.write'));
   perform pg_temp.ok('member: NOT payouts.view',           not public.capability_default('member','none','payouts.view'));
+  perform pg_temp.ok('member: NOT assets.write',           not public.capability_default('member','none','assets.write'));
 
   -- An unknown role holds nothing at all.
   perform pg_temp.ok('an unknown role holds nothing',

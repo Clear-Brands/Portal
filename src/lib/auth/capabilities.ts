@@ -33,6 +33,8 @@ export const CAPABILITIES = {
   'spiffs.view': 'See spiff amounts',
   'competitions.view': 'See competitions and sprints',
   'podium.view': 'See the 30-day podium',
+  'assets.write': 'Upload and remove partner assets',
+  'assets.view': 'See and download partner assets',
 } as const
 
 export type Capability = keyof typeof CAPABILITIES
@@ -64,10 +66,10 @@ export const ROLE_DEFAULTS: Record<string, readonly Capability[]> = {
   ],
 
   // Partner admins: their own organisation, money read-only.
-  partner_admin: ['payouts.view', 'revshare.view', 'people.write', 'exports.run'],
+  partner_admin: ['payouts.view', 'revshare.view', 'people.write', 'exports.run', 'assets.view'],
 
   // Members: what they can see of their own numbers.
-  member: ['spiffs.view', 'competitions.view', 'podium.view'],
+  member: ['spiffs.view', 'competitions.view', 'podium.view', 'assets.view'],
 } as const
 
 export const POD_DEFAULTS: Record<PodCapability, boolean> = {
@@ -114,6 +116,14 @@ export function defaultKey(role: Role, access: Access): string {
  *     checked in the application layer (export routes, nav visibility, the
  *     dashboard's podium and money columns) rather than in RLS, and apply to
  *     whichever roles those surfaces actually render for.
+ *   - `assets.write` gates a policy written against `my_role() = 'internal'`
+ *     only (0025_partner_assets.sql), same as `partners.write`/`rates.write`
+ *     — internal-only, applicable there and nowhere else.
+ *   - `assets.view` gates the partner-scoped read policy for `partner_admin`
+ *     and `member` only. An internal login's read access is never gated by
+ *     it (`partner_assets_read_internal` checks only role + active), and
+ *     nothing internal-facing renders a checkbox for it either, so it is not
+ *     in `internal`'s list below.
  */
 export const CAPABILITIES_APPLICABLE_TO: Record<Role, Capability[]> = {
   internal: [
@@ -131,6 +141,7 @@ export const CAPABILITIES_APPLICABLE_TO: Record<Role, Capability[]> = {
     'spiffs.view',
     'competitions.view',
     'podium.view',
+    'assets.write',
   ],
   partner_admin: [
     'people.write',
@@ -141,8 +152,16 @@ export const CAPABILITIES_APPLICABLE_TO: Record<Role, Capability[]> = {
     'spiffs.view',
     'competitions.view',
     'podium.view',
+    'assets.view',
   ],
-  member: ['payouts.view', 'exports.run', 'spiffs.view', 'competitions.view', 'podium.view'],
+  member: [
+    'payouts.view',
+    'exports.run',
+    'spiffs.view',
+    'competitions.view',
+    'podium.view',
+    'assets.view',
+  ],
 }
 
 /**

@@ -40,11 +40,13 @@ const NAV: Record<string, NavItem[]> = {
     { href: '/revshare', label: 'Rev share', capability: 'revshare.view' },
     { href: '/programs', label: 'Programs', capability: 'competitions.view' },
     { href: '/roster', label: 'Your team' },
+    { href: '/assets', label: 'Assets', capability: 'assets.view' },
   ],
   member: [
     { href: '/', label: 'Dashboard' },
     { href: '/my-deals', label: 'My deals' },
     { href: '/programs', label: 'Competitions', capability: 'competitions.view' },
+    { href: '/assets', label: 'Assets', capability: 'assets.view' },
   ],
 }
 

@@ -3,12 +3,14 @@ import { notFound, redirect } from 'next/navigation'
 import { can } from '@/lib/auth/capabilities'
 import { requireSession } from '@/lib/session'
 import { getPartnerById, listPartnerLogins } from '@/lib/data/partners'
+import { listPartnerAssets } from '@/lib/data/partner-assets'
 import { switchActivePartner } from '@/lib/actions/partners'
 import { Card, Eyebrow, Button, Pill, SectionHeading } from '@/components/ui'
 import { ArchivePartnerButton, RestorePartnerButton } from '../partner-controls'
 import { PartnerSettingsForm } from './partner-settings-form'
 import { PartnerRatesForm } from './partner-rates-form'
 import { AdminLogins } from './admin-logins'
+import { PartnerAssets } from './partner-assets'
 
 export const metadata = { title: 'Partner' }
 
@@ -26,9 +28,13 @@ export default async function PartnerDetailPage({
 
   const canEditProfile = can(profile, 'partners.write')
   const canEditRates = can(profile, 'rates.write')
+  const canManageAssets = can(profile, 'assets.write')
   const canManagePerms = profile.role === 'internal' && profile.access === 'admin'
 
-  const logins = await listPartnerLogins(partner.id)
+  const [logins, assets] = await Promise.all([
+    listPartnerLogins(partner.id),
+    listPartnerAssets(partner.id),
+  ])
 
   return (
     <>
@@ -81,6 +87,17 @@ export default async function PartnerDetailPage({
           </Card>
         </section>
       </div>
+
+      <section className="mt-6">
+        <SectionHeading className="mb-3">Partner assets</SectionHeading>
+        <Card>
+          <PartnerAssets partnerId={partner.id} assets={assets} canManage={canManageAssets} />
+        </Card>
+        <p className="mt-2 text-[12.5px] text-muted">
+          PDFs only. Visible to this partner&rsquo;s own logins on their Assets page as soon as they&rsquo;re
+          uploaded.
+        </p>
+      </section>
 
       <section className="mt-6">
         <SectionHeading className="mb-3">Admin logins</SectionHeading>

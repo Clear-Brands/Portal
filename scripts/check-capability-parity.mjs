@@ -50,9 +50,21 @@ function tsDefaults(roleKey) {
   return [...entry.matchAll(/'([a-z.]+)'/g)].map((m) => m[1])
 }
 
-/** Pull one role's default list out of the SQL capability_default() body. */
+/**
+ * Pull one role's default list out of the SQL capability_default() body — the
+ * LAST such definition across every migration, not the first.
+ *
+ * capability_default() started in 0007, but a later migration can redefine it
+ * wholesale with `create or replace function` to add a case branch — the
+ * same thing 0018_ongoing_revshare_comp.sql already does for
+ * compute_partner_comp(), and what 0025_partner_assets.sql does here to add
+ * assets.view. Matching only the first occurrence in `allSql` would keep
+ * comparing the TypeScript side against 0007's superseded body forever, so
+ * this searches every migration and takes the most recent match.
+ */
 function sqlDefaults(match) {
-  const clause = sql.match(new RegExp(`${match}[\\s\\S]*?p_key in \\(([\\s\\S]*?)\\)`))?.[1]
+  const re = new RegExp(`${match}[\\s\\S]*?p_key in \\(([\\s\\S]*?)\\)`, 'g')
+  const clause = [...allSql.matchAll(re)].at(-1)?.[1]
   if (!clause) return null
   return [...clause.matchAll(/'([a-z.]+)'/g)].map((m) => m[1])
 }

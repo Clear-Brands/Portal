@@ -71,6 +71,28 @@ export interface Partner {
   archivedAt: string | null
 }
 
+export interface PartnerAsset {
+  id: string
+  partnerId: string
+  title: string
+  storagePath: string
+  fileSize: number
+  uploadedByName: string | null
+  createdAt: string
+}
+
+export function toPartnerAsset(row: Row): PartnerAsset {
+  return {
+    id: row.id as string,
+    partnerId: row.partner_id as string,
+    title: row.title as string,
+    storagePath: row.storage_path as string,
+    fileSize: num(row.file_size),
+    uploadedByName: (row.uploaded_by_name as string) ?? null,
+    createdAt: row.created_at as string,
+  }
+}
+
 export interface PartnerRollup {
   partnerId: string
   name: string

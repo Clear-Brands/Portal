@@ -249,6 +249,14 @@ export function fmtCount(value: number | string | null | undefined) {
   return new Intl.NumberFormat('en-US').format(Number.isFinite(n) ? n : 0)
 }
 
+/** A file size — "340 KB", "2.4 MB" — for the partner assets list. */
+export function fmtBytes(value: number | string | null | undefined) {
+  const n = typeof value === 'string' ? Number(value) : (value ?? 0)
+  if (!Number.isFinite(n) || n <= 0) return '0 KB'
+  if (n < 1024 * 1024) return `${Math.max(1, Math.round(n / 1024))} KB`
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`
+}
+
 /**
  * One short-date format across the app: "Jan 5".
  *
