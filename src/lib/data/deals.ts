@@ -24,6 +24,7 @@ interface SearchRow {
   team_name: string | null
   team_color: string
   client_name: string
+  company: string
   service: string
   status: DealStatus
   spiff_amount: string
@@ -66,6 +67,7 @@ function toDealRow(r: SearchRow): DealRow {
     teamName: r.team_name,
     teamColor: r.team_color,
     clientName: r.client_name,
+    company: r.company ?? '',
     service: r.service ?? '',
     status: r.status,
     spiffAmount: n(r.spiff_amount),

@@ -58,6 +58,7 @@ export default async function DealDetailPage({
           <Card>
             <dl className="grid gap-2.5 text-[14px]">
               <Row label="Service" value={deal.service || '—'} />
+              <Row label="Company" value={deal.company || '—'} />
               <Row label="Contact" value={deal.contact || '—'} />
               <Row label="Phone" value={deal.phone || '—'} />
               <Row label="Email" value={deal.email || '—'} />

@@ -10,15 +10,16 @@ import { SubmitDealForm } from './submit-form'
 export const metadata = { title: 'My deals' }
 
 /**
- * The live booking calendar for a discovery call. This is the primary way a
- * referral gets logged — the form below is the fallback for when one somehow
- * doesn't make it onto a rep's own list of referrals.
- *
- * Flat link for now (not personalized per rep). Once bookings auto-create a
- * deal under the booking rep's name, this will need a per-rep query param so
- * the booking can be attributed — see the discovery-call automation work.
+ * The live booking calendar for a discovery call — the primary way a referral
+ * gets logged. Carries the rep's email as a query param so the GHL workflow
+ * can hand it back on its webhook and the booking lands under the right
+ * name automatically; see /api/webhooks/ghl-booking. The form below stays as
+ * the fallback for when that link breaks — never a second way to enter the
+ * same referral on purpose.
  */
-const BOOKING_URL = 'https://go.clearbrands.io/widget/bookings/fieldpulse/calendar'
+function bookingUrl(repEmail: string): string {
+  return `https://go.clearbrands.io/widget/bookings/fieldpulse/calendar?rep_email=${encodeURIComponent(repEmail)}`
+}
 
 /**
  * A member's own referrals.
@@ -54,7 +55,7 @@ export default async function MyDealsPage({
             (or beforehand) so it&rsquo;s tracked under your name — that part isn&rsquo;t automatic yet.
           </p>
           <a
-            href={BOOKING_URL}
+            href={bookingUrl(profile.email)}
             target="_blank"
             rel="noopener noreferrer"
             className="mt-4 inline-flex items-center justify-center rounded-[8px] bg-volt px-4 py-2.5 font-head text-[14px] font-bold tracking-[0.01em] text-ink transition-[filter] hover:brightness-110 active:brightness-95"

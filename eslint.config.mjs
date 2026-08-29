@@ -29,7 +29,13 @@ export default [
     // roster.ts and partners.ts are both the "auth admin" case — each does its
     // own authorisation against the session-scoped client before it ever
     // reaches the admin client, and only to create or invite an auth account.
-    files: ['src/lib/actions/roster.ts', 'src/lib/actions/partners.ts'],
+    // The GHL booking route is the "inbound webhook" case — no session exists
+    // to authorise against, so a shared secret stands in for one.
+    files: [
+      'src/lib/actions/roster.ts',
+      'src/lib/actions/partners.ts',
+      'src/app/api/webhooks/ghl-booking/route.ts',
+    ],
     rules: {
       'no-restricted-imports': 'off',
     },

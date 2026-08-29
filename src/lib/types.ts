@@ -30,6 +30,7 @@ export interface Deal {
   personName: string
   teamName: string | null
   clientName: string
+  company: string
   service: string
   status: DealStatus
   spiffAmount: number
@@ -177,6 +178,7 @@ export function toDeal(row: Row): Deal {
     personName: (p?.name as string) ?? '',
     teamName: (t?.name as string) ?? null,
     clientName: row.client_name as string,
+    company: (row.company as string) ?? '',
     service: (row.service as string) ?? '',
     status: row.status as DealStatus,
     spiffAmount: num(row.spiff_amount),
