@@ -10,6 +10,17 @@ import { SubmitDealForm } from './submit-form'
 export const metadata = { title: 'My deals' }
 
 /**
+ * The live booking calendar for a discovery call. This is the primary way a
+ * referral gets logged — the form below is the fallback for when one somehow
+ * doesn't make it onto a rep's own list of referrals.
+ *
+ * Flat link for now (not personalized per rep). Once bookings auto-create a
+ * deal under the booking rep's name, this will need a per-rep query param so
+ * the booking can be attributed — see the discovery-call automation work.
+ */
+const BOOKING_URL = 'https://go.clearbrands.io/widget/bookings/fieldpulse/calendar'
+
+/**
  * A member's own referrals.
  *
  * The list is filtered by row-level security, not by a where-clause the browser
@@ -36,7 +47,28 @@ export default async function MyDealsPage({
       </div>
 
       <section className="mb-9">
-        <SectionHeading className="mb-3">Submit a deal</SectionHeading>
+        <SectionHeading className="mb-3">Book a discovery call</SectionHeading>
+        <Card className="max-w-[680px]">
+          <p className="text-[14px] text-muted">
+            Got a referral? Book their discovery call directly on our calendar. Send it in below too
+            (or beforehand) so it&rsquo;s tracked under your name — that part isn&rsquo;t automatic yet.
+          </p>
+          <a
+            href={BOOKING_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 inline-flex items-center justify-center rounded-[8px] bg-volt px-4 py-2.5 font-head text-[14px] font-bold tracking-[0.01em] text-ink transition-[filter] hover:brightness-110 active:brightness-95"
+          >
+            Book a discovery call
+          </a>
+        </Card>
+      </section>
+
+      <section className="mb-9">
+        <SectionHeading className="mb-1">Submit a deal</SectionHeading>
+        <p className="mb-3 text-[13px] text-muted">
+          Log it here after booking so it shows up on your list below.
+        </p>
         <Card className="max-w-[680px]">
           <SubmitDealForm />
         </Card>

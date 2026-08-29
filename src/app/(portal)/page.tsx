@@ -237,7 +237,7 @@ async function MemberDashboard({
         <Card>
           <ol className="grid gap-3 text-[14px] text-muted">
             {[
-              'Send a referral through Submit a deal — client name is all we need to start.',
+              'Book their discovery call on our calendar from My deals, then submit the deal there too so it lands under your name.',
               'Clear Brands takes it from there and moves it to In talks once they are engaged.',
               'When the client pays their first invoice, your deal becomes Payable.',
               'Payable deals go out in one transfer at the end of the month.',
