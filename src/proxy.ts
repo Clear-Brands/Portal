@@ -12,7 +12,16 @@ import { NextResponse, type NextRequest } from 'next/server'
  * query is filtered by row-level security — a proxy can be bypassed by a
  * misconfigured matcher, so it is never the only thing standing in the way.
  */
-const PUBLIC_PATHS = ['/login', '/auth/callback', '/not-on-roster', '/access-paused']
+// /api/webhooks is its own namespace: every route under it authenticates a
+// caller with a shared-secret header (see ghl-booking/route.ts), not a
+// Supabase session, because the caller is a third-party service (GHL) that
+// never logs in. Without this, the proxy below 307-redirects an
+// unauthenticated POST to /login, /login has no POST handler, and the
+// caller sees a 405 that has nothing to do with the actual request — which
+// is exactly what happened here: GHL's webhook consistently failed with
+// "405 Method Not Allowed" even though its Method dropdown was correctly
+// set to POST, because the request never reached the webhook route at all.
+const PUBLIC_PATHS = ['/login', '/auth/callback', '/not-on-roster', '/access-paused', '/api/webhooks']
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })
