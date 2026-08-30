@@ -5,8 +5,9 @@ import Link from 'next/link'
 import { useActionState } from '@/lib/use-resilient-action'
 import { Button, Field, Notice, inputClass } from '@/components/ui'
 import { addDeal, type ActionState } from '@/lib/actions/deals'
-import type { PersonOption } from '@/lib/types'
+import { SERVICE_OPTIONS, type PersonOption } from '@/lib/types'
 import { PersonPicker } from './person-picker'
+import { ServiceCheckboxes } from '../service-checkboxes'
 
 const initial: ActionState = {}
 
@@ -39,14 +40,8 @@ export function DealForm({
       </Field>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Service">
-          <input className={inputClass} name="service" list="services" maxLength={80} />
-          <datalist id="services">
-            <option value="SEO" />
-            <option value="Paid Ads" />
-            <option value="Web Design" />
-            <option value="LSA" />
-          </datalist>
+        <Field label="Services" hint="Pick as many as apply">
+          <ServiceCheckboxes options={SERVICE_OPTIONS} />
         </Field>
         <Field label="Contact">
           <input className={inputClass} name="contact" maxLength={120} />

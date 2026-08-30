@@ -4,9 +4,11 @@ import { notFound } from 'next/navigation'
 import { can } from '@/lib/auth/capabilities'
 import { requireSession } from '@/lib/session'
 import { getActivePartner } from '@/lib/partner-context'
-import { getDeal } from '@/lib/data/deals'
+import { getDeal, getDealStatusHistory } from '@/lib/data/deals'
 import { Card, Eyebrow, SectionHeading, fmtMoney, fmtDate } from '@/components/ui'
 import { DealActions, DealStatusCell } from '../deal-actions'
+import { EditDealButton } from './edit-deal-button'
+import { DealTimeline } from './deal-timeline'
 
 export const metadata = { title: 'Deal' }
 
@@ -34,6 +36,7 @@ export default async function DealDetailPage({
 
   const canWrite = can(profile, 'deals.write')
   const showMoney = can(profile, 'spiffs.view') && (partner?.spiffsEnabled ?? true)
+  const stages = await getDealStatusHistory(deal.id)
 
   return (
     <>
@@ -50,6 +53,11 @@ export default async function DealDetailPage({
         {deal.promoNote ? (
           <p className="mt-1.5 text-[13.5px] text-muted italic">{deal.promoNote}</p>
         ) : null}
+        {canWrite ? (
+          <div className="mt-3">
+            <EditDealButton deal={deal} />
+          </div>
+        ) : null}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -57,7 +65,7 @@ export default async function DealDetailPage({
           <SectionHeading className="mb-3">Details</SectionHeading>
           <Card>
             <dl className="grid gap-2.5 text-[14px]">
-              <Row label="Service" value={deal.service || '—'} />
+              <Row label="Services" value={deal.services.join(', ') || '—'} />
               <Row label="Company" value={deal.company || '—'} />
               <Row label="Contact" value={deal.contact || '—'} />
               <Row label="Phone" value={deal.phone || '—'} />
@@ -129,6 +137,13 @@ export default async function DealDetailPage({
           </Card>
         </section>
       </div>
+
+      <section className="mt-6">
+        <SectionHeading className="mb-3">Timeline</SectionHeading>
+        <Card>
+          <DealTimeline stages={stages} />
+        </Card>
+      </section>
 
       {canWrite ? (
         <section className="mt-6">

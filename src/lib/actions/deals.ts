@@ -32,7 +32,6 @@ export type ActionState = { error?: string; ok?: string }
 const NewDeal = z.object({
   personId: z.guid('Choose which rep this referral belongs to'),
   clientName: z.string().trim().min(1, 'A client name is required').max(160),
-  service: z.string().trim().max(80).optional().default(''),
   city: z.string().trim().max(80).optional().default(''),
   state: z.string().trim().max(2).optional().default(''),
   contact: z.string().trim().max(120).optional().default(''),
@@ -72,7 +71,7 @@ export async function addDeal(_prev: ActionState, formData: FormData): Promise<A
     partner_id: partner.id,
     person_id: input.personId,
     client_name: input.clientName,
-    service: input.service,
+    services: parseServices(formData),
     city: input.city,
     state: input.state.toUpperCase(),
     contact: input.contact,
@@ -157,7 +156,6 @@ export async function transitionDeal(
 const EditDeal = z.object({
   dealId: z.guid(),
   clientName: z.string().trim().min(1, 'A client name is required').max(160),
-  service: z.string().trim().max(80).optional().default(''),
   personId: z.guid().optional(),
   city: z.string().trim().max(80).optional().default(''),
   state: z.string().trim().max(2).optional().default(''),
@@ -185,7 +183,7 @@ export async function editDeal(_prev: ActionState, formData: FormData): Promise<
     .from('deals')
     .update({
       client_name: fields.clientName,
-      service: fields.service,
+      services: parseServices(formData),
       ...(fields.personId ? { person_id: fields.personId } : {}),
       city: fields.city,
       state: fields.state.toUpperCase(),
@@ -199,6 +197,8 @@ export async function editDeal(_prev: ActionState, formData: FormData): Promise<
   if (error) return { error: friendly(error.message) }
 
   revalidatePath('/deals')
+  revalidatePath('/deals/pipeline')
+  revalidatePath(`/deals/${dealId}`)
   return { ok: 'Saved.' }
 }
 
@@ -288,7 +288,6 @@ export async function approveDealComp(_prev: ActionState, formData: FormData): P
 
 const SubmitDeal = z.object({
   clientName: z.string().trim().min(1, 'Tell us who the client is').max(160),
-  service: z.string().trim().max(80).optional().default(''),
   city: z.string().trim().max(80).optional().default(''),
   state: z.string().trim().max(2).optional().default(''),
   contact: z.string().trim().max(120).optional().default(''),
@@ -308,7 +307,7 @@ export async function submitDeal(_prev: ActionState, formData: FormData): Promis
   const supabase = await createClient()
   const { error } = await supabase.rpc('submit_deal', {
     p_client: parsed.data.clientName,
-    p_service: parsed.data.service,
+    p_services: parseServices(formData),
     p_city: parsed.data.city,
     p_state: parsed.data.state,
     p_contact: parsed.data.contact,
@@ -340,6 +339,26 @@ export async function switchPartner(formData: FormData): Promise<void> {
 }
 
 /* -------------------------------------------------------------------------- */
+
+/**
+ * Pull the multi-select "services" checkboxes off a submission.
+ *
+ * FormData carries a repeated field as multiple entries under the same key —
+ * `Object.fromEntries(formData)`, which every schema above parses from,
+ * silently keeps only the last one. So this reads services straight off the
+ * FormData with `getAll`, never through zod's object parse, is the one place
+ * that has to. Trimmed, de-duped, capped — the same shape zod would have
+ * enforced, just done by hand.
+ */
+function parseServices(formData: FormData): string[] {
+  const seen = new Set<string>()
+  for (const raw of formData.getAll('services')) {
+    const value = String(raw).trim().slice(0, 80)
+    if (value) seen.add(value)
+    if (seen.size >= 8) break
+  }
+  return [...seen]
+}
 
 /**
  * Turn a Postgres error into something worth reading.

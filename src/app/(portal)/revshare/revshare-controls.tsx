@@ -174,7 +174,19 @@ export function MarkChurnedButton({ dealId, clientName }: { dealId: string; clie
         error={state.error}
         formAction={action}
         hiddenFields={{ dealId, live: 'false' }}
-      />
+      >
+        <label className="block">
+          <span className="mb-1.5 block font-head text-[12px] tracking-[0.1em] text-muted uppercase">
+            Why (shows on the deals tab)
+          </span>
+          <textarea
+            name="note"
+            rows={2}
+            placeholder="Cancelled, switched agencies, stopped responding…"
+            className="w-full rounded-[8px] border border-line bg-surface-2 px-3 py-2.5 text-[15px] text-paper placeholder:text-muted/60"
+          />
+        </label>
+      </ConfirmDialog>
     </>
   )
 }

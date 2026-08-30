@@ -65,15 +65,25 @@ export default async function MyDealsPage({
         </Card>
       </section>
 
-      <section className="mb-9">
-        <SectionHeading className="mb-1">Submit a deal</SectionHeading>
-        <p className="mb-3 text-[13px] text-muted">
-          Log it here after booking so it shows up on your list below.
-        </p>
-        <Card className="max-w-[680px]">
-          <SubmitDealForm />
-        </Card>
-      </section>
+      {partner?.selfServeDealsEnabled !== false ? (
+        <section className="mb-9">
+          <SectionHeading className="mb-1">Submit a deal</SectionHeading>
+          <p className="mb-3 text-[13px] text-muted">
+            Log it here after booking so it shows up on your list below.
+          </p>
+          <Card className="max-w-[680px]">
+            <SubmitDealForm />
+          </Card>
+        </section>
+      ) : (
+        <section className="mb-9">
+          <SectionHeading className="mb-1">Submit a deal</SectionHeading>
+          <p className="text-[13px] text-muted">
+            Manual entry is off for {partner?.name ?? 'your account'} — book the discovery call above
+            and it logs itself. Ask Clear Brands if you think this is wrong.
+          </p>
+        </section>
+      )}
 
       <section>
         <SectionHeading className="mb-1">Your referrals</SectionHeading>
@@ -102,7 +112,7 @@ export default async function MyDealsPage({
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="truncate text-paper">{deal.clientName}</div>
-                      <div className="text-[12px] text-muted">{deal.service || '—'}</div>
+                      <div className="text-[12px] text-muted">{deal.services.join(', ') || '—'}</div>
                     </div>
                     <span className="num shrink-0 text-[12px] text-muted">
                       {fmtDate(deal.createdAt)}
@@ -144,7 +154,7 @@ export default async function MyDealsPage({
                     <tr key={deal.id} className="align-top hover:bg-white/[0.025]">
                       <td className="border-b border-line px-[22px] py-3.5 text-[14px]">
                         <div className="text-paper">{deal.clientName}</div>
-                        <div className="text-[12px] text-muted">{deal.service || '—'}</div>
+                        <div className="text-[12px] text-muted">{deal.services.join(', ') || '—'}</div>
                       </td>
                       <td className="border-b border-line px-[22px] py-3.5">
                         <Pill tone={deal.status} />

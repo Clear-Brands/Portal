@@ -23,6 +23,11 @@ export const DEAL_STATUS_LABEL: Record<DealStatus, string> = {
 /** The order the pipeline reads in. */
 export const PIPELINE_ORDER: DealStatus[] = ['submitted', 'in_talks', 'closed', 'paid', 'lost']
 
+/** The known service checkboxes on the deal form. A deal can also carry a
+ *  free-text service alongside these — "services" is just a text array, not
+ *  an enum, so nothing here is enforced by the database. */
+export const SERVICE_OPTIONS = ['SEO', 'Paid Ads', 'Web Design', 'LSA'] as const
+
 export interface Deal {
   id: string
   partnerId: string
@@ -32,6 +37,7 @@ export interface Deal {
   clientName: string
   company: string
   service: string
+  services: string[]
   status: DealStatus
   spiffAmount: number
   partnerComp: number
@@ -45,6 +51,8 @@ export interface Deal {
   state: string
   promoNote: string
   lostReason: string
+  churnNote: string
+  churnedAt: string | null
   closedAt: string | null
   lostAt: string | null
   payoutId: string | null
@@ -67,6 +75,7 @@ export interface Partner {
   revshareEnabled: boolean
   competitionsEnabled: boolean
   annualEnabled: boolean
+  selfServeDealsEnabled: boolean
   brandAccent: string
   archivedAt: string | null
 }
@@ -202,6 +211,7 @@ export function toDeal(row: Row): Deal {
     clientName: row.client_name as string,
     company: (row.company as string) ?? '',
     service: (row.service as string) ?? '',
+    services: (row.services as string[] | null) ?? [],
     status: row.status as DealStatus,
     spiffAmount: num(row.spiff_amount),
     partnerComp: num(row.partner_comp),
@@ -215,6 +225,8 @@ export function toDeal(row: Row): Deal {
     state: (row.state as string) ?? '',
     promoNote: (row.promo_note as string) ?? '',
     lostReason: (row.lost_reason as string) ?? '',
+    churnNote: (row.churn_note as string) ?? '',
+    churnedAt: (row.churned_at as string) ?? null,
     closedAt: (row.closed_at as string) ?? null,
     lostAt: (row.lost_at as string) ?? null,
     payoutId: (row.payout_id as string) ?? null,
@@ -239,6 +251,7 @@ export function toPartner(row: Row): Partner {
     revshareEnabled: row.revshare_enabled !== false,
     competitionsEnabled: row.competitions_enabled !== false,
     annualEnabled: row.annual_enabled !== false,
+    selfServeDealsEnabled: row.self_serve_deals_enabled !== false,
     brandAccent: (row.brand_accent as string) ?? '#C8F52F',
     archivedAt: (row.archived_at as string) ?? null,
   }

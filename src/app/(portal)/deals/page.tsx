@@ -102,7 +102,7 @@ export default async function DealsPage({
                   <div className="min-w-0">
                     <div className="truncate text-paper">{deal.clientName}</div>
                     <div className="text-[12px] text-muted">
-                      {[deal.service, [deal.city, deal.state].filter(Boolean).join(', ')]
+                      {[deal.services.join(', '), [deal.city, deal.state].filter(Boolean).join(', ')]
                         .filter(Boolean)
                         .join(' · ') || '—'}
                     </div>

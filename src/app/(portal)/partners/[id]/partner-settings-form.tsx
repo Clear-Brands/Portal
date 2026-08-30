@@ -16,6 +16,13 @@ const FEATURES: { key: keyof Partner; name: string; label: string }[] = [
   { key: 'annualEnabled', name: 'annualEnabled', label: 'Closers Club' },
 ]
 
+const SELF_SERVE: { key: keyof Partner; name: string; label: string; hint: string } = {
+  key: 'selfServeDealsEnabled',
+  name: 'selfServeDealsEnabled',
+  label: 'Reps can submit a deal manually',
+  hint: 'Off means only Clear Brands can add deals for this partner — the booking-link automation still logs deals on its own either way.',
+}
+
 export function PartnerSettingsForm({ partner }: { partner: Partner }) {
   const [state, action, pending] = useActionState(updatePartnerProfile, initial)
 
@@ -54,6 +61,18 @@ export function PartnerSettingsForm({ partner }: { partner: Partner }) {
             {f.label}
           </label>
         ))}
+
+        <div className="mt-1 border-t border-line pt-3">
+          <label className="flex items-center gap-2.5 text-[13.5px] text-paper">
+            <input
+              type="checkbox"
+              name={SELF_SERVE.name}
+              defaultChecked={Boolean(partner[SELF_SERVE.key])}
+            />
+            {SELF_SERVE.label}
+          </label>
+          <p className="mt-1 pl-[26px] text-[12px] text-muted">{SELF_SERVE.hint}</p>
+        </div>
       </div>
 
       {state.error ? <Notice tone="error">{state.error}</Notice> : null}

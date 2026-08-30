@@ -355,6 +355,7 @@ const UpdateProfile = z.object({
   revshareEnabled: z.string().optional(),
   competitionsEnabled: z.string().optional(),
   annualEnabled: z.string().optional(),
+  selfServeDealsEnabled: z.string().optional(),
 })
 
 /** Branding and feature toggles — everything except rates. */
@@ -382,6 +383,7 @@ export async function updatePartnerProfile(_prev: ActionState, formData: FormDat
       revshare_enabled: input.revshareEnabled === 'on',
       competitions_enabled: input.competitionsEnabled === 'on',
       annual_enabled: input.annualEnabled === 'on',
+      self_serve_deals_enabled: input.selfServeDealsEnabled === 'on',
     })
     .eq('id', input.partnerId)
 

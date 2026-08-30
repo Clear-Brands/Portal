@@ -5,6 +5,8 @@ import { useEffect, useRef } from 'react'
 import { useActionState } from '@/lib/use-resilient-action'
 import { Button, Field, Notice, inputClass } from '@/components/ui'
 import { submitDeal, type ActionState } from '@/lib/actions/deals'
+import { SERVICE_OPTIONS } from '@/lib/types'
+import { ServiceCheckboxes } from '../deals/service-checkboxes'
 
 const initial: ActionState = {}
 
@@ -27,8 +29,8 @@ export function SubmitDealForm() {
       </Field>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Service">
-          <input className={inputClass} name="service" maxLength={80} placeholder="SEO, Paid Ads…" />
+        <Field label="Services" hint="Pick as many as apply">
+          <ServiceCheckboxes options={SERVICE_OPTIONS} />
         </Field>
         <Field label="Contact">
           <input className={inputClass} name="contact" maxLength={120} />

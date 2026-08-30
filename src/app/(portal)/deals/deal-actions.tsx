@@ -158,16 +158,33 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
-/** The status pill, plus the age line the original showed under it. */
+/** The status pill, plus the age line the original showed under it.
+ *
+ * Rev-share live/churn is a separate axis from status — a deal can be
+ * "Paid" and also churned out of the rev-share programme — so it shows here
+ * as a second pill rather than overloading DEAL_STATUS_LABEL. Marking an
+ * account churned still happens on /revshare; this is what closes the gap
+ * Cristian flagged: "it takes them off of rev share but it doesn't show
+ * churned in the deals tab."
+ */
 export function DealStatusCell({ deal }: { deal: DealRow }) {
   return (
     <div className="flex flex-col items-start gap-1">
-      <Pill tone={deal.status} />
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Pill tone={deal.status} />
+        {deal.live === false ? <Pill tone="lost">Churned</Pill> : null}
+      </div>
       {(deal.status === 'submitted' || deal.status === 'in_talks') && deal.ageDays >= 30 ? (
         <span className="text-[11.5px] text-warn">⚠ No movement in {deal.ageDays} days</span>
       ) : null}
       {deal.status === 'lost' && deal.lostReason ? (
         <span className="text-[11.5px] text-muted">{deal.lostReason}</span>
+      ) : null}
+      {deal.live === false && deal.churnNote ? (
+        <span className="text-[11.5px] text-muted">
+          {deal.churnedAt ? `Churned ${deal.churnedAt} — ` : ''}
+          {deal.churnNote}
+        </span>
       ) : null}
       {DEAL_STATUS_LABEL[deal.status] === 'Paid' && deal.locked ? (
         <span className="text-[11.5px] text-muted">Settled</span>

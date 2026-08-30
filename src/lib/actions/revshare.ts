@@ -101,6 +101,7 @@ export async function voidRevshareStatement(_prev: ActionState, formData: FormDa
 const SetLive = z.object({
   dealId: z.guid(),
   live: z.enum(['true', 'false']),
+  note: z.string().trim().max(300).optional().default(''),
 })
 
 export async function setAccountLiveState(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -114,16 +115,22 @@ export async function setAccountLiveState(_prev: ActionState, formData: FormData
     return { error: 'Something is missing there — try again.' }
   }
 
+  const live = parsed.data.live === 'true'
   const supabase = await createClient()
   const { error } = await supabase
     .from('deals')
-    .update({ live: parsed.data.live === 'true' })
+    // churned_at is stamped by the deals_stamp_lifecycle trigger (0026) the
+    // instant `live` flips to false, and cleared the instant it flips back —
+    // this only ever needs to carry the note itself.
+    .update({ live, ...(live ? {} : { churn_note: parsed.data.note }) })
     .eq('id', parsed.data.dealId)
 
   if (error) return { error: friendly(error.message) }
 
   revalidatePath('/revshare')
-  return { ok: parsed.data.live === 'true' ? 'Marked live.' : 'Marked churned.' }
+  revalidatePath('/deals')
+  revalidatePath('/deals/pipeline')
+  return { ok: live ? 'Marked live.' : 'Marked churned.' }
 }
 
 const AddToProgramme = z.object({

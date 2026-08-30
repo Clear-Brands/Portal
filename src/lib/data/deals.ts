@@ -26,6 +26,7 @@ interface SearchRow {
   client_name: string
   company: string
   service: string
+  services: string[] | null
   status: DealStatus
   spiff_amount: string
   partner_comp: string
@@ -39,6 +40,8 @@ interface SearchRow {
   state: string
   promo_note: string
   lost_reason: string
+  churn_note: string
+  churned_at: string | null
   closed_at: string | null
   lost_at: string | null
   payout_id: string | null
@@ -69,6 +72,7 @@ function toDealRow(r: SearchRow): DealRow {
     clientName: r.client_name,
     company: r.company ?? '',
     service: r.service ?? '',
+    services: r.services ?? (r.service ? [r.service] : []),
     status: r.status,
     spiffAmount: n(r.spiff_amount),
     partnerComp: n(r.partner_comp),
@@ -82,6 +86,8 @@ function toDealRow(r: SearchRow): DealRow {
     state: r.state ?? '',
     promoNote: r.promo_note ?? '',
     lostReason: r.lost_reason ?? '',
+    churnNote: r.churn_note ?? '',
+    churnedAt: r.churned_at,
     closedAt: r.closed_at,
     lostAt: r.lost_at,
     payoutId: r.payout_id,
@@ -179,6 +185,50 @@ export async function getDeal(id: string): Promise<DealRow | null> {
 
   const row = ((data ?? []) as SearchRow[]).find((r) => r.id === id)
   return row ? toDealRow(row) : null
+}
+
+/* -------------------------------------------------------------------------- */
+/* Per-stage duration                                                           */
+/* -------------------------------------------------------------------------- */
+
+export interface StageDuration {
+  status: DealStatus
+  enteredAt: string
+  /** Whole days spent in this stage — from enteredAt to the next entry, or to
+   *  now for the deal's current stage. */
+  days: number
+  current: boolean
+}
+
+/**
+ * How long a deal has spent in each stage it has passed through, computed
+ * from deal_status_history (0026) — logged automatically on every
+ * transition, so this never drifts from what actually happened. RLS on that
+ * table mirrors deals' own read policies, so a member calling this for a
+ * deal that is not theirs simply gets nothing back.
+ */
+export async function getDealStatusHistory(dealId: string): Promise<StageDuration[]> {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('deal_status_history')
+    .select('status, entered_at')
+    .eq('deal_id', dealId)
+    .order('entered_at', { ascending: true })
+
+  const rows = (data ?? []) as { status: DealStatus; entered_at: string }[]
+  const now = Date.now()
+
+  return rows.map((row, i) => {
+    const next = rows[i + 1]
+    const end = next ? new Date(next.entered_at).getTime() : now
+    const start = new Date(row.entered_at).getTime()
+    return {
+      status: row.status,
+      enteredAt: row.entered_at,
+      days: Math.max(0, Math.round((end - start) / 86_400_000)),
+      current: !next,
+    }
+  })
 }
 
 /* -------------------------------------------------------------------------- */
