@@ -7,7 +7,11 @@ import { useCloseOnSuccess } from '@/lib/use-close-on-success'
 import { Button, Field, Notice, inputClass } from '@/components/ui'
 import { ConfirmDialog } from '@/components/dialog'
 import { PermissionGridButton } from '@/components/permission-grid'
-import { addPartnerAdminLogin } from '@/lib/actions/partners'
+import {
+  addPartnerAdminLogin,
+  editPartnerAdminLogin,
+  removePartnerAdminLogin,
+} from '@/lib/actions/partners'
 import type { ActionState } from '@/lib/actions/deals'
 import type { PartnerLogin } from '@/lib/data/partners'
 
@@ -39,15 +43,19 @@ export function AdminLogins({
               <span className="flex-1 truncate text-paper">{login.name}</span>
               <span className="text-[12px] text-muted">{login.email}</span>
               {canManagePerms ? (
-                <PermissionGridButton
-                  login={{
-                    profileId: login.id,
-                    name: login.name,
-                    role: login.role,
-                    access: login.access,
-                    perms: login.perms,
-                  }}
-                />
+                <>
+                  <EditAdminButton profileId={login.id} name={login.name} />
+                  <RemoveAdminButton profileId={login.id} name={login.name} />
+                  <PermissionGridButton
+                    login={{
+                      profileId: login.id,
+                      name: login.name,
+                      role: login.role,
+                      access: login.access,
+                      perms: login.perms,
+                    }}
+                  />
+                </>
               ) : null}
             </li>
           ))}
@@ -97,6 +105,64 @@ function AddAdminButton({ partnerId }: { partnerId: string }) {
       {state.ok ? (
         <Notice tone="success">{state.ok}</Notice>
       ) : null}
+    </>
+  )
+}
+
+function EditAdminButton({ profileId, name }: { profileId: string; name: string }) {
+  const [state, action, pending] = useActionState(editPartnerAdminLogin, initial)
+  const [open, setOpen] = useState(false)
+
+  useCloseOnSuccess(state.ok, setOpen)
+
+  return (
+    <>
+      <Button size="sm" variant="ghost" type="button" onClick={() => setOpen(true)}>
+        Edit
+      </Button>
+
+      <ConfirmDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title={`Edit ${name}`}
+        confirmLabel="Save"
+        pending={pending}
+        error={state.error}
+        formAction={action}
+        hiddenFields={{ profileId }}
+      >
+        <Field label="Name">
+          <input name="name" required defaultValue={name} className={inputClass} />
+        </Field>
+      </ConfirmDialog>
+    </>
+  )
+}
+
+function RemoveAdminButton({ profileId, name }: { profileId: string; name: string }) {
+  const [state, action, pending] = useActionState(removePartnerAdminLogin, initial)
+  const [open, setOpen] = useState(false)
+
+  useCloseOnSuccess(state.ok, setOpen)
+
+  return (
+    <>
+      <Button size="sm" variant="ghost" type="button" onClick={() => setOpen(true)}>
+        Remove
+      </Button>
+
+      <ConfirmDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title={`Remove ${name}?`}
+        description="They lose their login right away. This can't be undone — inviting them back means a fresh invite email."
+        confirmLabel="Remove"
+        destructive
+        pending={pending}
+        error={state.error}
+        formAction={action}
+        hiddenFields={{ profileId }}
+      />
     </>
   )
 }

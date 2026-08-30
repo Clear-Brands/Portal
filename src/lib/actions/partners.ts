@@ -190,6 +190,98 @@ async function inviteAdminLoginInternal(
   return {}
 }
 
+const EditAdmin = z.object({
+  profileId: z.guid(),
+  name: z.string().trim().min(1, 'A name is required').max(160),
+})
+
+/**
+ * Renames a partner admin's login. Email is fixed to the address they were
+ * invited with — changing an auth account's email needs its own
+ * re-verification flow this doesn't have, so the path for a wrong email is
+ * remove-and-reinvite, not edit.
+ */
+export async function editPartnerAdminLogin(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const profile = await requireSession()
+  if (!can(profile, 'partners.write')) {
+    return { error: 'Editing an admin login needs partner permissions.' }
+  }
+
+  const parsed = EditAdmin.safeParse(Object.fromEntries(formData))
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Check the form and try again.' }
+  }
+
+  // The admin client here mirrors inviteAdminLoginInternal below: a manager
+  // can hold partners.write without holding profiles_write_admin (only an
+  // internal admin does, per Fix 1 in 0014), so the RLS-scoped client would
+  // reject this update for anyone but an admin even though the capability
+  // check above already allowed it.
+  const admin = createAdminClient()
+  const { data: target } = await admin
+    .from('profiles')
+    .select('id, role')
+    .eq('id', parsed.data.profileId)
+    .maybeSingle()
+
+  if (!target || target.role !== 'partner_admin') {
+    return { error: 'That login could not be found.' }
+  }
+
+  const { error } = await admin.from('profiles').update({ name: parsed.data.name }).eq('id', target.id)
+  if (error) return { error: friendly(error.message) }
+
+  revalidatePath('/partners')
+  return { ok: 'Saved.' }
+}
+
+const RemoveAdmin = z.object({ profileId: z.guid() })
+
+/**
+ * Removes a partner admin login entirely — the auth account and the profiles
+ * row both go, not just one. Deleting only the profiles row would leave a
+ * dangling auth account that can still sign in and land on /not-on-roster;
+ * that's confusing, not actually revoked. Uses the same admin client as
+ * inviteAdminLoginInternal, for the same reason (see the comment on
+ * editPartnerAdminLogin above) and because deleting an auth user is one of
+ * this app's few sanctioned admin-client uses to begin with.
+ */
+export async function removePartnerAdminLogin(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const profile = await requireSession()
+  if (!can(profile, 'partners.write')) {
+    return { error: 'Removing an admin login needs partner permissions.' }
+  }
+
+  const parsed = RemoveAdmin.safeParse(Object.fromEntries(formData))
+  if (!parsed.success) return { error: 'Something is missing there — try again.' }
+
+  const admin = createAdminClient()
+  const { data: target } = await admin
+    .from('profiles')
+    .select('id, user_id, role')
+    .eq('id', parsed.data.profileId)
+    .maybeSingle()
+
+  if (!target || target.role !== 'partner_admin') {
+    return { error: 'That login could not be found.' }
+  }
+  if (target.user_id === profile.userId) {
+    return { error: 'You cannot remove your own login — ask another admin.' }
+  }
+
+  const { error: profileError } = await admin.from('profiles').delete().eq('id', target.id)
+  if (profileError) return { error: friendly(profileError.message) }
+
+  // Best-effort: the profiles row is already gone (the part RLS and every
+  // page actually check), so a failure here leaves an orphaned auth account
+  // rather than a half-removed login. Not surfaced as an error since retrying
+  // the whole action would just fail again on "profile not found."
+  await admin.auth.admin.deleteUser(target.user_id)
+
+  revalidatePath('/partners')
+  return { ok: 'Removed.' }
+}
+
 /* -------------------------------------------------------------------------- */
 /* Clear Brands team                                                           */
 /* -------------------------------------------------------------------------- */

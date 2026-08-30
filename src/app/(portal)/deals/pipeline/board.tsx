@@ -1,6 +1,7 @@
 'use client'
 
 import { useOptimistic, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   DndContext,
   KeyboardSensor,
@@ -202,19 +203,35 @@ function Card({
   showMoney: boolean
   draggable: boolean
 }) {
+  const router = useRouter()
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: deal.id,
     disabled: !draggable || deal.locked,
   })
 
+  // Dragging and opening the card share the same click: dnd-kit's
+  // activationConstraint (distance: 6, set on the sensor above) only starts a
+  // drag once the pointer has actually moved, so a plain click still reaches
+  // this handler untouched — no drag ever fires for it. isDragging is the
+  // belt-and-suspenders check for the rare case a drag is mid-flight when the
+  // pointer is released back over the same card.
+  function open() {
+    if (isDragging) return
+    router.push(`/deals/${deal.id}`)
+  }
+
   return (
     <article
       ref={setNodeRef}
       {...(draggable && !deal.locked ? { ...listeners, ...attributes } : {})}
+      onClick={open}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') open()
+      }}
       style={transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined}
       className={cn(
         'rounded-[10px] border border-line bg-surface-2 px-3 py-2.5',
-        draggable && !deal.locked && 'cursor-grab active:cursor-grabbing',
+        draggable && !deal.locked ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
         isDragging && 'z-50 opacity-90 shadow-2xl',
       )}
     >
