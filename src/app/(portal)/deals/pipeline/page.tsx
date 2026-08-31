@@ -9,10 +9,17 @@ import { PipelineBoard } from './board'
 
 export const metadata = { title: 'Pipeline' }
 
-export default async function PipelinePage() {
+export default async function PipelinePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
   const profile = await requireSession()
   const partner = await getActivePartner()
-  const pipeline = await loadPipeline()
+  const params = await searchParams
+  const churnedParam = params.churned
+  const churned = (Array.isArray(churnedParam) ? churnedParam[0] : churnedParam) === '1'
+  const pipeline = await loadPipeline(churned)
 
   if (!pipeline) {
     return (
@@ -30,11 +37,19 @@ export default async function PipelinePage() {
           <h1 className="font-head text-[26px] leading-tight text-paper">Pipeline</h1>
           <p className="mt-1.5 text-[13px] text-muted">
             Drag a card, or focus one and press Space then the arrow keys.
+            {churned ? ' Showing churned accounts only.' : null}
           </p>
         </div>
-        <Button variant="ghost" size="sm">
-          <Link href={'/deals'}>List view</Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button variant={churned ? 'primary' : 'ghost'} size="sm">
+            <Link href={churned ? '/deals/pipeline' : '/deals/pipeline?churned=1'}>
+              {churned ? 'Churned only ✓' : 'Churned only'}
+            </Link>
+          </Button>
+          <Button variant="ghost" size="sm">
+            <Link href={'/deals'}>List view</Link>
+          </Button>
+        </div>
       </div>
 
       <PipelineBoard

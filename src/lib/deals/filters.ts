@@ -64,6 +64,17 @@ export interface DealFilters {
   sort: DealSort
   page: number
   perPage: number
+  /**
+   * Churn is not a deal status — a churned account can sit in any status
+   * (almost always 'paid') with churned_at stamped once `live` flips false
+   * (0026). So this is its own on/off filter rather than another value of
+   * `status`, and it composes with status the same way team/person do —
+   * except the filter bar's Status control treats "Churned" as mutually
+   * exclusive with a specific status, since asking for both at once ("Paid
+   * AND churned") is a much narrower question than what "Churned" means on
+   * its own here.
+   */
+  churned: boolean
 }
 
 export const DEFAULT_FILTERS: DealFilters = {
@@ -78,6 +89,7 @@ export const DEFAULT_FILTERS: DealFilters = {
   sort: 'newest',
   page: 1,
   perPage: 25,
+  churned: false,
 }
 
 type ParamsLike = Record<string, string | string[] | undefined>
@@ -122,6 +134,7 @@ export function parseFilters(params: ParamsLike): DealFilters {
     perPage: (PER_PAGE_OPTIONS as readonly number[]).includes(perPage)
       ? perPage
       : DEFAULT_FILTERS.perPage,
+    churned: one(params, 'churned') === '1',
   }
 }
 
@@ -146,6 +159,7 @@ export function toSearchParams(filters: Partial<DealFilters>): string {
   if (merged.sort !== DEFAULT_FILTERS.sort) params.set('sort', merged.sort)
   if (merged.page > 1) params.set('page', String(merged.page))
   if (merged.perPage !== DEFAULT_FILTERS.perPage) params.set('per', String(merged.perPage))
+  if (merged.churned) params.set('churned', '1')
 
   const query = params.toString()
   return query ? `?${query}` : ''
@@ -191,9 +205,11 @@ export function describeFilters(
   const parts: string[] = []
 
   parts.push(
-    filters.status === 'all'
-      ? 'All deals'
-      : `${filters.status === 'closed' ? 'Payable' : filters.status.replace('_', ' ')} deals`,
+    filters.churned
+      ? 'Churned deals'
+      : filters.status === 'all'
+        ? 'All deals'
+        : `${filters.status === 'closed' ? 'Payable' : filters.status.replace('_', ' ')} deals`,
   )
 
   if (context.personName) parts.push(`from ${context.personName}`)
@@ -221,6 +237,7 @@ export function hasActiveFilters(filters: DealFilters): boolean {
     filters.teamId !== null ||
     filters.personId !== null ||
     filters.range !== DEFAULT_FILTERS.range ||
-    filters.on !== DEFAULT_FILTERS.on
+    filters.on !== DEFAULT_FILTERS.on ||
+    filters.churned !== DEFAULT_FILTERS.churned
   )
 }

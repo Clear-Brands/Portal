@@ -70,10 +70,20 @@ export function FilterBar({
   }, [query])
 
   const status = (params.get('status') ?? 'all') as DealStatus | 'all'
+  const churned = params.get('churned') === '1'
   const range = (params.get('range') ?? '90d') as DateRange
   const on = params.get('on') === 'closed' ? 'closed' : 'created'
   const sort = (params.get('sort') ?? 'newest') as DealSort
   const team = params.get('team') ?? ''
+
+  // Churn isn't a deal status — a churned account can sit in any status,
+  // almost always 'paid' — so it can't just join DEAL_STATUSES. It reads as
+  // one more stage in this row because that's how the request for it was
+  // framed ("we have all the other stages to filter by but need this one"),
+  // but picking it clears `status` and picking a status clears `churned`:
+  // asking for both ("Paid AND churned") is a narrower question than what
+  // either one means alone here.
+  const statusValue = churned ? 'churned' : status
 
   return (
     <div className={cn('grid gap-3', pending && 'opacity-60')} aria-busy={pending}>
@@ -111,11 +121,14 @@ export function FilterBar({
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <Segmented
           label="Status"
-          value={status}
-          onChange={(v) => apply({ status: v === 'all' ? null : v })}
+          value={statusValue}
+          onChange={(v) =>
+            apply(v === 'churned' ? { status: null, churned: '1' } : { status: v === 'all' ? null : v, churned: null })
+          }
           options={[
             { value: 'all', label: 'All' },
             ...DEAL_STATUSES.map((s) => ({ value: s, label: DEAL_STATUS_LABEL[s] })),
+            { value: 'churned', label: 'Churned' },
           ]}
         />
 

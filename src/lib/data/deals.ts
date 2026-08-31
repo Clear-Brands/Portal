@@ -111,6 +111,7 @@ async function toArgs(filters: DealFilters, partnerId: string) {
     p_to: to,
     p_on: filters.on,
     p_q: filters.q || null,
+    p_churned: filters.churned ? true : null,
   }
 }
 
@@ -243,12 +244,20 @@ export interface Pipeline {
   perColumn: number
 }
 
-export async function loadPipeline(): Promise<Pipeline | null> {
+/**
+ * @param churned When true, every column only shows deals that have gone
+ *   churned (churned_at set) — same tri-state meaning as DealFilters.churned:
+ *   this narrows within a status, it does not replace it. A churned account
+ *   almost always sits in 'paid', but this doesn't assume that — a card only
+ *   moves off the board when its underlying status filter says so.
+ */
+export async function loadPipeline(churned = false): Promise<Pipeline | null> {
   const partner = await getActivePartner()
   if (!partner) return null
 
   const supabase = await createClient()
   const statuses: DealStatus[] = ['submitted', 'in_talks', 'closed', 'paid', 'lost']
+  const p_churned = churned ? true : null
 
   const [columnResults, countResult] = await Promise.all([
     Promise.all(
@@ -258,11 +267,12 @@ export async function loadPipeline(): Promise<Pipeline | null> {
           p_status: status,
           p_sort: 'newest',
           p_limit: PIPELINE_PER_COLUMN,
+          p_churned,
         })
         return [status, ((data ?? []) as SearchRow[]).map(toDealRow)] as const
       }),
     ),
-    supabase.rpc('deal_status_counts', { p_partner_id: partner.id }),
+    supabase.rpc('deal_status_counts', { p_partner_id: partner.id, p_churned }),
   ])
 
   const counts: Record<string, number> = {}
