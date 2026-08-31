@@ -4,6 +4,8 @@ import type { NextRequest } from 'next/server'
 
 import { createAdminClient } from '@/lib/supabase/admin'
 
+type AdminClient = ReturnType<typeof createAdminClient>
+
 /**
  * Turns a GHL discovery-call booking into a deal under the referring rep's
  * name — the automatic half of what "Book a discovery call" on My deals
@@ -174,15 +176,19 @@ async function handleBooking(request: NextRequest, body: BookingPayload) {
   const repEmail = body.rep_email?.trim().toLowerCase()
   if (!repEmail) return fail('Booking carried no rep_email')
 
-  const { data: person } = await admin
-    .from('people')
-    .select('id')
-    .eq('partner_id', partner.id)
-    .ilike('email', repEmail)
-    .eq('active', true)
-    .maybeSingle()
-
-  if (!person) return fail(`No active rep at ${partnerSlug} matches "${repEmail}"`)
+  // "Make it so that when a rep submits a deal and they aren't already in
+  // the portal it auto sends them an invite to create a password/account."
+  // (Aug 2026 edit doc, High Priority.) A rep who clicks their own booking
+  // link before Clear Brands has added them to the roster — or who's on the
+  // roster but was never given a login — is the normal case this is for, not
+  // a typo: GHL only ever sends an email it read off the rep's own hidden
+  // field. ensureRepAccount() covers both: create the person if they're
+  // wholly new, invite them if they don't have a login yet, and never block
+  // the deal itself over invite plumbing (it always returns the person as
+  // long as one exists or was created — only null if the match is a
+  // deliberately deactivated rep, or the new person row couldn't be made).
+  const person = await ensureRepAccount(admin, partner.id, repEmail)
+  if (!person) return fail(`No active rep at ${partnerSlug} matches "${repEmail}", and auto-invite failed`)
 
   const clientName = [body.first_name, body.last_name].filter(Boolean).join(' ').trim() || 'Discovery call booking'
 
@@ -212,4 +218,97 @@ async function handleBooking(request: NextRequest, body: BookingPayload) {
     .eq('id', eventId)
 
   return Response.json({ ok: true, dealId: deal.id })
+}
+
+/**
+ * Find, create, or invite the rep this booking belongs to. Three cases:
+ *
+ *   1. An active person with this email already has a portal login — return
+ *      them as-is, nothing to do.
+ *   2. An active person with this email exists but has never logged in
+ *      (added to the roster without "create a login" checked, or via CSV
+ *      import) — send them the same invite "Send login invite" on their
+ *      roster row would.
+ *   3. No person with this email exists at all for this partner — this is a
+ *      brand-new rep clicking their own booking link before anyone at Clear
+ *      Brands added them. Create the roster row, then invite as in case 2.
+ *
+ * A person who exists but is `active = false` is a deliberate Clear Brands
+ * decision (see setPersonActive) — a webhook is never the thing that
+ * reverses that, so that case returns null and the caller fails the event
+ * exactly like the old "no active rep matches" behaviour.
+ *
+ * The deal itself is the one thing this must not lose to invite plumbing:
+ * once a person row exists (found or created), this always returns it, even
+ * if the auth invite or the profiles insert fails — Clear Brands can always
+ * send the login invite by hand afterward from the roster.
+ */
+async function ensureRepAccount(
+  admin: AdminClient,
+  partnerId: string,
+  email: string,
+): Promise<{ id: string } | null> {
+  const { data: existing } = await admin
+    .from('people')
+    .select('id, name, active')
+    .eq('partner_id', partnerId)
+    .ilike('email', email)
+    .maybeSingle()
+
+  if (existing && !existing.active) return null
+
+  let personId: string
+  let personName: string
+
+  if (existing) {
+    personId = existing.id
+    personName = existing.name as string
+  } else {
+    personName = nameFromEmail(email)
+    const { data: created, error } = await admin
+      .from('people')
+      .insert({ partner_id: partnerId, name: personName, email, kind: 'rep', active: true })
+      .select('id, name')
+      .single()
+    if (error || !created) return null
+    personId = created.id
+    personName = created.name
+  }
+
+  const { data: profile } = await admin
+    .from('profiles')
+    .select('id')
+    .eq('person_id', personId)
+    .maybeSingle()
+  if (profile) return { id: personId }
+
+  const { data: createdUser, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+  })
+  if (inviteError || !createdUser.user) return { id: personId }
+
+  const { error: profileError } = await admin.from('profiles').insert({
+    user_id: createdUser.user.id,
+    partner_id: partnerId,
+    person_id: personId,
+    role: 'member',
+    access: 'none',
+    name: personName,
+    email,
+  })
+  // Don't leave an auth account nothing points at — same rule roster.ts
+  // follows for every other invite path.
+  if (profileError) await admin.auth.admin.deleteUser(createdUser.user.id)
+
+  return { id: personId }
+}
+
+/** A best-effort display name from the local part of an email, e.g.
+ *  "jane.doe" -> "Jane Doe" — good enough to identify the rep in the roster
+ *  until someone corrects it there; never blocks anything on being wrong. */
+function nameFromEmail(email: string): string {
+  const local = email.split('@')[0] ?? email
+  const words = local.split(/[._+-]+/).filter(Boolean)
+  if (words.length === 0) return email
+  return words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 }
