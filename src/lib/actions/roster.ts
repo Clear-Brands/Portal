@@ -142,7 +142,7 @@ export async function enablePortalLogin(_prev: ActionState, formData: FormData):
   const admin = createAdminClient()
   const { data: created, error: inviteError } = await admin.auth.admin.inviteUserByEmail(
     person.email as string,
-    { redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback` },
+    { redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/accept-invite` },
   )
 
   if (inviteError || !created.user) {
@@ -235,7 +235,7 @@ export async function addPerson(_prev: ActionState, formData: FormData): Promise
 
   const admin = createAdminClient()
   const { data: created, error: inviteError } = await admin.auth.admin.inviteUserByEmail(person.email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/accept-invite`,
   })
 
   if (inviteError || !created.user) {
@@ -400,7 +400,7 @@ export async function commitRosterImport(_prev: ActionState, formData: FormData)
     if (wantsLogins && admin) {
       try {
         const { data: created, error: inviteError } = await admin.auth.admin.inviteUserByEmail(person.email, {
-          redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+          redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/accept-invite`,
         })
         if (inviteError || !created.user) continue
 

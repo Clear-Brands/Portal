@@ -21,7 +21,20 @@ import { NextResponse, type NextRequest } from 'next/server'
 // is exactly what happened here: GHL's webhook consistently failed with
 // "405 Method Not Allowed" even though its Method dropdown was correctly
 // set to POST, because the request never reached the webhook route at all.
-const PUBLIC_PATHS = ['/login', '/auth/callback', '/not-on-roster', '/access-paused', '/api/webhooks']
+// /accept-invite and /auth/set-session must also be reachable with no
+// session: they're where someone lands straight out of an invite (or
+// reset-password) email, before any cookie exists — accept-invite-form.tsx
+// sets one via /auth/set-session as its first step. See the comment on that
+// route for why this can't just reuse /auth/callback's ?code= flow.
+const PUBLIC_PATHS = [
+  '/login',
+  '/auth/callback',
+  '/auth/set-session',
+  '/accept-invite',
+  '/not-on-roster',
+  '/access-paused',
+  '/api/webhooks',
+]
 
 // getUser() below makes a real network call to Supabase's auth server, on
 // almost every request to the site (see the matcher). A slow or hung

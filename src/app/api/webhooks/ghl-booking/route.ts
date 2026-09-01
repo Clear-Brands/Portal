@@ -283,7 +283,7 @@ async function ensureRepAccount(
   if (profile) return { id: personId }
 
   const { data: createdUser, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/accept-invite`,
   })
   if (inviteError || !createdUser.user) return { id: personId }
 

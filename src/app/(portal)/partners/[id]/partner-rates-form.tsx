@@ -36,23 +36,25 @@ export function PartnerRatesForm({ partner }: { partner: Partner }) {
         revshare_statements / revshare_pct in 0018), independent of comp
         mode entirely — and it is ALSO, only when compMode is
         'ongoing_pct', the rate a newly-approved deal's ongoing comp uses.
-        Showing it unconditionally, sitting right above "Partner
-        compensation," made it read as a compensation input even for
-        partners with Rev share off and a flat/percentage-per-close comp
-        mode — Cristian's "I want to get rid of this... this needs to be
-        gone" on the walkthrough (Aug 2026). So it now only appears when
-        one of those two things it actually feeds is true; otherwise a
-        hidden input carries its last saved value forward untouched, same
-        pattern as compFlat/compPct below.
+        It used to also show whenever partner.revshareEnabled (the "Rev
+        share" Feature toggle) was on, but that toggle is an unrelated
+        concern — whether the partner's portal shows a Rev share tab at
+        all — and showing this field because of it let Rev-share % surface
+        on the rates form for partners with no ongoing_pct comp, which
+        reads as "this partner has a negotiated rev-share rate" even when
+        they don't. Rev-share is meant to be a negotiation lever Clear
+        Brands offers selectively, not something visible by default
+        (Cristian's "Revshare Partner Settings and Negotiation Logic"
+        walkthrough, Sept 2026) — so visibility here now follows comp mode
+        alone. The stored rate itself is untouched when hidden (a hidden
+        input still carries it forward), since the monthly statement still
+        needs it independent of comp mode; only this form's visibility of
+        it changed.
       */}
-      {partner.revshareEnabled || compMode === 'ongoing_pct' ? (
+      {compMode === 'ongoing_pct' ? (
         <Field
           label="Rev-share %"
-          hint={
-            compMode === 'ongoing_pct'
-              ? "The rate below applies here too — this is what \"Percentage of ongoing rev share\" pays, once a deal is approved."
-              : 'Applied to the accruing monthly base each statement.'
-          }
+          hint="The rate below applies here too — this is what &ldquo;Percentage of ongoing rev share&rdquo; pays, once a deal is approved."
         >
           <input
             name="revsharePct"

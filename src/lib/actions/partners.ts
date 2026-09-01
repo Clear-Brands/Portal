@@ -166,7 +166,7 @@ async function inviteAdminLoginInternal(
   const admin = createAdminClient()
 
   const { data: created, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/accept-invite`,
   })
 
   if (inviteError || !created.user) {
@@ -282,6 +282,48 @@ export async function removePartnerAdminLogin(_prev: ActionState, formData: Form
   return { ok: 'Removed.' }
 }
 
+const ResetAdminPassword = z.object({ profileId: z.guid() })
+
+/**
+ * Emails a partner admin a link to set a new password, for when they're
+ * locked out rather than being removed and re-invited. Same link mechanics
+ * as an invite — see /accept-invite and its /auth/set-session comment —
+ * which is why this points at the same redirectTo: resetPasswordForEmail
+ * generates a `type=recovery` link instead of `type=invite`, but the
+ * tokens-in-a-fragment shape and the "set a password" step at the other end
+ * are identical, so one page handles both.
+ */
+export async function sendPartnerAdminPasswordReset(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const profile = await requireSession()
+  if (!can(profile, 'partners.write')) {
+    return { error: 'Resetting a login needs partner permissions.' }
+  }
+
+  const parsed = ResetAdminPassword.safeParse(Object.fromEntries(formData))
+  if (!parsed.success) return { error: 'Something is missing there — try again.' }
+
+  const admin = createAdminClient()
+  const { data: target } = await admin
+    .from('profiles')
+    .select('id, role, email')
+    .eq('id', parsed.data.profileId)
+    .maybeSingle()
+
+  if (!target || target.role !== 'partner_admin') {
+    return { error: 'That login could not be found.' }
+  }
+
+  const { error } = await admin.auth.resetPasswordForEmail(target.email as string, {
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/accept-invite`,
+  })
+  if (error) return { error: 'Could not send the reset email. Try again.' }
+
+  return { ok: `Sent a password reset to ${target.email}.` }
+}
+
 /* -------------------------------------------------------------------------- */
 /* Clear Brands team                                                           */
 /* -------------------------------------------------------------------------- */
@@ -313,7 +355,7 @@ export async function addInternalLogin(_prev: ActionState, formData: FormData): 
 
   const admin = createAdminClient()
   const { data: created, error: inviteError } = await admin.auth.admin.inviteUserByEmail(parsed.data.email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/accept-invite`,
   })
 
   if (inviteError || !created.user) {

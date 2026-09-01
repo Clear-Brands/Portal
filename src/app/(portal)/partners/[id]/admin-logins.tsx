@@ -11,6 +11,7 @@ import {
   addPartnerAdminLogin,
   editPartnerAdminLogin,
   removePartnerAdminLogin,
+  sendPartnerAdminPasswordReset,
 } from '@/lib/actions/partners'
 import type { ActionState } from '@/lib/actions/deals'
 import type { PartnerLogin } from '@/lib/data/partners'
@@ -45,6 +46,7 @@ export function AdminLogins({
               {canManagePerms ? (
                 <>
                   <EditAdminButton profileId={login.id} name={login.name} />
+                  <ResetPasswordButton profileId={login.id} name={login.name} />
                   <RemoveAdminButton profileId={login.id} name={login.name} />
                   <PermissionGridButton
                     login={{
@@ -135,6 +137,35 @@ function EditAdminButton({ profileId, name }: { profileId: string; name: string 
           <input name="name" required defaultValue={name} className={inputClass} />
         </Field>
       </ConfirmDialog>
+    </>
+  )
+}
+
+function ResetPasswordButton({ profileId, name }: { profileId: string; name: string }) {
+  const [state, action, pending] = useActionState(sendPartnerAdminPasswordReset, initial)
+  const [open, setOpen] = useState(false)
+
+  useCloseOnSuccess(state.ok, setOpen)
+
+  return (
+    <>
+      <Button size="sm" variant="ghost" type="button" onClick={() => setOpen(true)}>
+        Reset password
+      </Button>
+
+      <ConfirmDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title={`Reset ${name}'s password`}
+        description="Sends them an email with a link to set a new password."
+        confirmLabel="Send reset email"
+        pending={pending}
+        error={state.error}
+        formAction={action}
+        hiddenFields={{ profileId }}
+      />
+
+      {state.ok ? <Notice tone="success">{state.ok}</Notice> : null}
     </>
   )
 }
