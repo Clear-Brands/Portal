@@ -142,6 +142,23 @@ export async function transitionDeal(
 
   if (error) return { error: friendly(error.message) }
 
+  // Moving to "closed" ("Payable" — see DEAL_STATUS_LABEL) is also where
+  // DealActions' confirm dialog now asks someone to finalize the deal's
+  // services (Cristian, Sept 2 edit doc), since that dialog is the reliable
+  // point someone looks at a deal before it pays out — services previously
+  // could only be fixed a click away, on the deal's own page. Every other
+  // transition button (In talks, Lost, Reopen, Back to In talks) submits no
+  // services checkboxes at all, so this only ever runs for the one dialog
+  // that has them; parseServices() on those other forms would otherwise read
+  // as "nothing checked" and wipe services that were never meant to change.
+  if (parsed.data.status === 'closed') {
+    const { error: servicesError } = await supabase
+      .from('deals')
+      .update({ services: parseServices(formData) })
+      .eq('id', parsed.data.dealId)
+    if (servicesError) return { error: friendly(servicesError.message) }
+  }
+
   revalidatePath('/deals')
   revalidatePath('/deals/pipeline')
   revalidatePath('/payouts')

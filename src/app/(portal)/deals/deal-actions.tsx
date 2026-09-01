@@ -5,10 +5,11 @@ import { useState } from 'react'
 import { useActionState } from '@/lib/use-resilient-action'
 import { useCloseOnSuccess } from '@/lib/use-close-on-success'
 
-import { Button, Pill, fmtMoney } from '@/components/ui'
+import { Button, Field, Pill, fmtMoney } from '@/components/ui'
 import { ConfirmDialog } from '@/components/dialog'
 import { transitionDeal, type ActionState } from '@/lib/actions/deals'
-import { DEAL_STATUS_LABEL } from '@/lib/types'
+import { DEAL_STATUS_LABEL, SERVICE_OPTIONS } from '@/lib/types'
+import { ServiceCheckboxes } from './service-checkboxes'
 import type { DealRow } from '@/lib/data/deals'
 
 const initial: ActionState = {}
@@ -86,7 +87,15 @@ export function DealActions({ deal, canWrite }: { deal: DealRow; canWrite: boole
       ) : null}
 
       {/* Moving a deal to Payable is what puts money on the next transfer, so it
-          shows the amount and who it belongs to before it commits. */}
+          shows the amount and who it belongs to before it commits. It's also the
+          last point anyone reliably looks at this deal before it's paid out, so
+          this is where services get finalized too — the only edit surface for
+          services used to be "Edit details" on the deal's own page, a click away
+          from the pipeline row someone's actually working from. (Cristian, Sept 2
+          edit doc: an edit-services affordance "before switching to payable," and
+          a prompt to "finalize the services... before we can move it to first
+          invoice paid" — this dialog now does both in one step.) Pre-filled from
+          the deal's current services; leaving them as-is submits them unchanged. */}
       <ConfirmDialog
         open={closeOpen}
         onClose={() => setCloseOpen(false)}
@@ -112,6 +121,12 @@ export function DealActions({ deal, canWrite }: { deal: DealRow; canWrite: boole
             />
           ) : null}
         </dl>
+
+        <div className="mt-3.5">
+          <Field label="Services" hint="Confirm what this deal actually closed with">
+            <ServiceCheckboxes options={SERVICE_OPTIONS} defaultSelected={deal.services ?? []} />
+          </Field>
+        </div>
       </ConfirmDialog>
 
       <ConfirmDialog
