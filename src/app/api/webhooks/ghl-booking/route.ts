@@ -49,6 +49,16 @@ type AdminClient = ReturnType<typeof createAdminClient>
  * POST reads the payload from the JSON body as documented above, GET reads
  * the identical shape from the URL's query string (?contact_id=...&rep_
  * email=...), and both funnel into the same handler below.
+ *
+ * In practice GHL doesn't honor the custom-mapped body shape either — every
+ * real delivery seen so far (checked directly against webhook_events rows)
+ * carries its full native contact/trigger payload instead of the clean
+ * object above, the same way it ignores the Method dropdown. `contact_id`,
+ * `first_name`, `last_name`, `email`, `city`, and `state` all happen to
+ * still land at the same top-level keys either way, so those read fine as
+ * BookingPayload. `rep_email` doesn't: see extractRepEmail() below for
+ * where it actually lives and why a plain `body.rep_email` read (the
+ * previous version of this file) never once matched.
  */
 
 type BookingPayload = {
@@ -62,6 +72,76 @@ type BookingPayload = {
   state?: string
   notes?: string
   rep_email?: string
+}
+
+// The unparsed request body/query, used only by extractRepEmail() below to
+// dig for fields BookingPayload doesn't know the real location of.
+type RawPayload = Record<string, unknown>
+
+function asString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined
+}
+
+// Deliberately stricter than "truthy": customData.rep_email has been seen
+// holding the literal, unresolved merge-tag label "Rep Email" instead of an
+// address (GHL's variable substitution failing silently) — that string is
+// truthy and would otherwise win over a real candidate checked after it.
+function looksLikeEmail(value: string | undefined): value is string {
+  return !!value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
+// The booking link GHL sends reps carries ?rep_email=... on it, and that
+// query string survives inside contact.lastAttributionSource.url (and its
+// sibling attributionSource.url) no matter what shape the rest of the
+// delivery takes — the one candidate below that's held up across every
+// payload variant observed so far.
+function repEmailFromUrl(url: unknown): string | undefined {
+  const raw = asString(url)
+  if (!raw) return undefined
+  try {
+    return asString(new URL(raw).searchParams.get('rep_email') ?? undefined)
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Finds the rep's email wherever this particular delivery put it. In
+ * priority order:
+ *
+ *   1. body.rep_email       — the documented custom-mapped shape; never
+ *                              actually observed, checked first in case
+ *                              GHL's mapping starts honoring it
+ *   2. raw['Rep Email']            — GHL's own field label, when it forwards
+ *   3. raw['FieldPulse Rep Email']   the raw contact instead of custom data
+ *   4. raw.customData?.rep_email        — sometimes the real value, sometimes
+ *   5. raw.customData?.['Rep Email']      the broken merge-tag label itself
+ *   6. ?rep_email= on contact.lastAttributionSource.url
+ *   7. ?rep_email= on contact.attributionSource.url
+ *
+ * Every candidate goes through looksLikeEmail() rather than a truthiness
+ * check, specifically because of #4/#5 above.
+ */
+function extractRepEmail(body: BookingPayload, raw: RawPayload): string | undefined {
+  const customData = raw.customData as RawPayload | undefined
+  const contact = raw.contact as RawPayload | undefined
+  const lastAttribution = contact?.lastAttributionSource as RawPayload | undefined
+  const attribution = contact?.attributionSource as RawPayload | undefined
+
+  const candidates = [
+    asString(body.rep_email),
+    asString(raw['Rep Email']),
+    asString(raw['FieldPulse Rep Email']),
+    asString(customData?.rep_email),
+    asString(customData?.['Rep Email']),
+    repEmailFromUrl(lastAttribution?.url),
+    repEmailFromUrl(attribution?.url),
+  ]
+
+  for (const candidate of candidates) {
+    if (looksLikeEmail(candidate)) return candidate.toLowerCase()
+  }
+  return undefined
 }
 
 function secretMatches(request: NextRequest): boolean {
@@ -80,14 +160,14 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  let body: BookingPayload
+  let raw: RawPayload
   try {
-    body = (await request.json()) as BookingPayload
+    raw = (await request.json()) as RawPayload
   } catch {
     return Response.json({ error: 'Body was not valid JSON' }, { status: 400 })
   }
 
-  return handleBooking(request, body)
+  return handleBooking(request, raw as BookingPayload, raw)
 }
 
 // See the file-level comment above: GHL's Webhook action has been observed
@@ -114,11 +194,15 @@ export async function GET(request: NextRequest) {
     notes: params.get('notes') ?? undefined,
     rep_email: params.get('rep_email') ?? undefined,
   }
+  // Query strings don't nest, so this only ever feeds extractRepEmail()'s
+  // top-level candidates (a differently-cased key GHL might append) — its
+  // contact.* candidates simply won't match anything here, which is fine.
+  const raw: RawPayload = Object.fromEntries(params.entries())
 
-  return handleBooking(request, body)
+  return handleBooking(request, body, raw)
 }
 
-async function handleBooking(request: NextRequest, body: BookingPayload) {
+async function handleBooking(request: NextRequest, body: BookingPayload, raw: RawPayload) {
   const partnerSlug = request.nextUrl.searchParams.get('partner') ?? ''
   if (!partnerSlug) {
     return Response.json({ error: 'Missing ?partner= on the webhook URL' }, { status: 400 })
@@ -173,7 +257,7 @@ async function handleBooking(request: NextRequest, body: BookingPayload) {
 
   if (!partner) return fail(`No active partner with slug "${partnerSlug}"`)
 
-  const repEmail = body.rep_email?.trim().toLowerCase()
+  const repEmail = extractRepEmail(body, raw)
   if (!repEmail) return fail('Booking carried no rep_email')
 
   // "Make it so that when a rep submits a deal and they aren't already in
