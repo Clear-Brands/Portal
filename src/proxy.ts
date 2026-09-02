@@ -26,8 +26,11 @@ import { NextResponse, type NextRequest } from 'next/server'
 // reset-password) email, before any cookie exists — accept-invite-form.tsx
 // sets one via /auth/set-session as its first step. See the comment on that
 // route for why this can't just reuse /auth/callback's ?code= flow.
+// /signup is the same story for self-serve signup (src/app/signup/actions.ts):
+// by definition nobody hitting it has a session yet.
 const PUBLIC_PATHS = [
   '/login',
+  '/signup',
   '/auth/callback',
   '/auth/set-session',
   '/accept-invite',
