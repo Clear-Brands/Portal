@@ -7,9 +7,15 @@ import { createClient } from '@/lib/supabase/server'
 
 export type AcceptInviteState = { error?: string }
 
-const NewPassword = z.object({
-  password: z.string().min(8, 'Use at least 8 characters'),
-})
+const NewPassword = z
+  .object({
+    password: z.string().min(8, 'Use at least 8 characters'),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: 'Passwords don’t match',
+    path: ['confirmPassword'],
+  })
 
 /**
  * Sets the password for whoever the current session cookie belongs to.
@@ -25,7 +31,10 @@ export async function setInitialPassword(
   _prev: AcceptInviteState,
   formData: FormData,
 ): Promise<AcceptInviteState> {
-  const parsed = NewPassword.safeParse({ password: formData.get('password') })
+  const parsed = NewPassword.safeParse({
+    password: formData.get('password'),
+    confirmPassword: formData.get('confirmPassword'),
+  })
 
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Enter a password' }

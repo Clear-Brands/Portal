@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 
 import { useActionState } from '@/lib/use-resilient-action'
 import { Button, Field, Notice, inputClass } from '@/components/ui'
@@ -98,7 +99,7 @@ export function AcceptInviteForm() {
                 Choose a password. You&rsquo;ll use it to sign back in next time.
               </p>
 
-              <Field label="Password">
+              <Field label="New password">
                 <input
                   className={inputClass}
                   type="password"
@@ -110,11 +111,30 @@ export function AcceptInviteForm() {
                 />
               </Field>
 
+              <Field label="Confirm new password">
+                <input
+                  className={inputClass}
+                  type="password"
+                  name="confirmPassword"
+                  autoComplete="new-password"
+                  minLength={8}
+                  required
+                />
+              </Field>
+
               {state.error ? <Notice tone="error">{state.error}</Notice> : null}
 
-              <Button type="submit" disabled={pending}>
-                {pending ? 'Saving…' : 'Set password and continue'}
-              </Button>
+              <div className="flex items-center gap-3">
+                <Button type="submit" disabled={pending}>
+                  {pending ? 'Saving…' : 'Change password'}
+                </Button>
+                <Link
+                  href="/login"
+                  className="text-[13.5px] text-muted underline decoration-line hover:text-paper"
+                >
+                  Cancel
+                </Link>
+              </div>
             </form>
           )}
         </div>
