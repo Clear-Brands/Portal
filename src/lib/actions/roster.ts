@@ -335,7 +335,48 @@ const CommitImport = z.object({
   createLogins: z.string().optional(),
 })
 
-export async function commitRosterImport(_prev: ActionState, formData: FormData): Promise<ActionState> {
+/** One chunk's worth of rows for a bulk `people` insert — small enough that a
+ * single bad row's fallback (see below) never has far to walk, large enough
+ * that a 500-row import is a handful of round trips, not five hundred. */
+const INSERT_CHUNK_SIZE = 100
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
+  return out
+}
+
+export type RosterCommitState = ActionState & {
+  /** Newly-created people still waiting on a portal invite. The commit
+   * itself never sends one — see sendRosterInviteBatch below for why. */
+  pendingInvites?: { id: string; name: string; email: string }[]
+}
+
+/**
+ * Inserts the selected rows into `people`. This used to also send each new
+ * person's portal invite inline, one at a time — fine for the handful of
+ * rows a manual add produces, but a real 500-row roster import made two
+ * different things break at once: 500 sequential `inviteUserByEmail` calls
+ * take far longer than a serverless function gets to run (Netlify's default
+ * is 10s), so the request would simply time out partway through with no
+ * record of where it stopped; and Supabase's own project-level email rate
+ * limit — separate from whatever the SMTP provider allows — would start
+ * silently failing invites well before row 500, caught only by the bare
+ * `catch { continue }` that swallowed it.
+ *
+ * So this function's only job now is the `people` rows, done as a few bulk
+ * upserts instead of 500 single-row inserts (fast, and `ignoreDuplicates`
+ * means one duplicate-email race doesn't take its whole chunk down with it —
+ * a chunk that fails outright falls back to inserting its rows one at a
+ * time, so a genuinely bad row only costs that row, not the other 99 next to
+ * it). Invite-sending, when requested, is handed off to the client as a
+ * list of newly-created people; see sendRosterInviteBatch and
+ * import-wizard.tsx for the batched, paced send that replaces the old loop.
+ */
+export async function commitRosterImport(
+  _prev: RosterCommitState,
+  formData: FormData,
+): Promise<RosterCommitState> {
   const profile = await requireSession()
   if (!can(profile, 'people.write')) {
     return { error: 'Importing people needs roster permissions.' }
@@ -371,56 +412,56 @@ export async function commitRosterImport(_prev: ActionState, formData: FormData)
   if (toInsert.length === 0) return { error: 'Nothing selected to import.' }
 
   const wantsLogins = parsed.data.createLogins === 'on'
-  const admin = wantsLogins ? createAdminClient() : null
 
   let imported = 0
-  let invited = 0
   let failed = 0
+  const insertedPeople: { id: string; name: string; email: string }[] = []
 
-  for (const row of toInsert) {
-    const { data: person, error } = await supabase
+  for (const batch of chunk(toInsert, INSERT_CHUNK_SIZE)) {
+    const rowsToUpsert = batch.map((row) => ({
+      partner_id: partner.id,
+      team_id: row.teamId,
+      name: row.name,
+      email: row.email,
+      kind: row.kind,
+      active: true,
+    }))
+
+    const { data, error } = await supabase
       .from('people')
-      .insert({
-        partner_id: partner.id,
-        team_id: row.teamId,
-        name: row.name,
-        email: row.email,
-        kind: row.kind,
-        active: true,
-      })
+      .upsert(rowsToUpsert, { onConflict: 'partner_id,email', ignoreDuplicates: true })
       .select('id, name, email')
-      .single()
 
-    if (error || !person) {
-      failed++
+    if (!error && data) {
+      imported += data.length
+      failed += batch.length - data.length
+      insertedPeople.push(...(data as { id: string; name: string; email: string }[]))
       continue
     }
-    imported++
 
-    if (wantsLogins && admin) {
-      try {
-        const { data: created, error: inviteError } = await admin.auth.admin.inviteUserByEmail(person.email, {
-          redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/accept-invite`,
-        })
-        if (inviteError || !created.user) continue
-
-        const { error: profileError } = await admin.from('profiles').insert({
-          user_id: created.user.id,
+    // The whole chunk failed outright — rare (the rows are already validated
+    // against duplicates and known pods above), but if it happens, fall back
+    // to one row at a time so a single bad row only costs itself.
+    for (const row of batch) {
+      const { data: person, error: rowError } = await supabase
+        .from('people')
+        .insert({
           partner_id: partner.id,
-          person_id: person.id,
-          role: 'member',
-          access: 'none',
-          name: person.name,
-          email: person.email,
+          team_id: row.teamId,
+          name: row.name,
+          email: row.email,
+          kind: row.kind,
+          active: true,
         })
-        if (profileError) {
-          await admin.auth.admin.deleteUser(created.user.id)
-          continue
-        }
-        invited++
-      } catch {
+        .select('id, name, email')
+        .single()
+
+      if (rowError || !person) {
+        failed++
         continue
       }
+      imported++
+      insertedPeople.push(person)
     }
   }
 
@@ -430,9 +471,105 @@ export async function commitRosterImport(_prev: ActionState, formData: FormData)
 
   const parts = [`Imported ${imported} ${imported === 1 ? 'person' : 'people'}.`]
   if (failed > 0) parts.push(`${failed} row${failed === 1 ? '' : 's'} failed on save — nothing else changed for those.`)
-  if (wantsLogins) parts.push(`Sent ${invited} portal invite${invited === 1 ? '' : 's'}.`)
 
-  return { ok: parts.join(' ') }
+  if (!wantsLogins || insertedPeople.length === 0) {
+    return { ok: parts.join(' ') }
+  }
+
+  parts.push('Sending portal invites…')
+  return { ok: parts.join(' '), pendingInvites: insertedPeople }
+}
+
+const InviteBatchInput = z.array(z.guid()).min(1).max(25)
+
+export type InviteBatchItem = { personId: string; email: string; ok: boolean; message?: string }
+export type InviteBatchResult = { results: InviteBatchItem[] } | { error: string }
+
+/**
+ * Sends portal invites for a small batch of already-created people, called
+ * repeatedly by the client (see import-wizard.tsx) rather than once for an
+ * entire import. Capped at 25 per call by design: each call is its own
+ * request with its own timeout budget, and pacing calls from the client —
+ * rather than looping 500 times inside one function invocation — is what
+ * keeps a big import from timing out or outrunning Supabase's email rate
+ * limit in the first place.
+ *
+ * Idempotent by construction: a person who already has a profile (an
+ * earlier batch succeeded, or this batch is a retry) is reported ok without
+ * sending a second invite, so re-running a partially-failed batch is safe.
+ */
+export async function sendRosterInviteBatch(personIds: string[]): Promise<InviteBatchResult> {
+  const profile = await requireSession()
+  if (!can(profile, 'people.write')) {
+    return { error: 'Sending invites needs people permissions.' }
+  }
+
+  const partner = await getActivePartner()
+  if (!partner) return { error: 'No partner program is selected.' }
+
+  const parsed = InviteBatchInput.safeParse(personIds)
+  if (!parsed.success) return { error: 'Nothing to invite.' }
+
+  // Same authorisation shape as enablePortalLogin above: only people this
+  // session can already read (their own partner, per RLS) are eligible —
+  // the admin client below never sees an id this lookup didn't confirm.
+  const supabase = await createClient()
+  const { data: people } = await supabase
+    .from('people')
+    .select('id, name, email, active')
+    .eq('partner_id', partner.id)
+    .in('id', parsed.data)
+
+  const byId = new Map((people ?? []).map((p) => [p.id as string, p]))
+  const admin = createAdminClient()
+  const results: InviteBatchItem[] = []
+
+  for (const id of parsed.data) {
+    const person = byId.get(id)
+    if (!person || !person.active) {
+      results.push({ personId: id, email: person?.email ?? '', ok: false, message: 'Not found' })
+      continue
+    }
+
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('person_id', person.id)
+      .maybeSingle()
+    if (existingProfile) {
+      results.push({ personId: id, email: person.email, ok: true, message: 'Already invited' })
+      continue
+    }
+
+    const { data: created, error: inviteError } = await admin.auth.admin.inviteUserByEmail(person.email, {
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/accept-invite`,
+    })
+
+    if (inviteError || !created.user) {
+      results.push({ personId: id, email: person.email, ok: false, message: 'Invite failed' })
+      continue
+    }
+
+    const { error: profileError } = await admin.from('profiles').insert({
+      user_id: created.user.id,
+      partner_id: partner.id,
+      person_id: person.id,
+      role: 'member',
+      access: 'none',
+      name: person.name,
+      email: person.email,
+    })
+
+    if (profileError) {
+      await admin.auth.admin.deleteUser(created.user.id)
+      results.push({ personId: id, email: person.email, ok: false, message: 'Could not finish setup' })
+      continue
+    }
+
+    results.push({ personId: id, email: person.email, ok: true })
+  }
+
+  return { results }
 }
 
 /* -------------------------------------------------------------------------- */

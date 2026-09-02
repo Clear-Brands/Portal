@@ -1,14 +1,31 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { useActionState } from '@/lib/use-resilient-action'
 import { Button, Notice, Pill, cn, fmtCount } from '@/components/ui'
-import { commitRosterImport, previewRosterImport, type ImportPreviewState } from '@/lib/actions/roster'
-import type { ActionState } from '@/lib/actions/deals'
+import {
+  commitRosterImport,
+  previewRosterImport,
+  sendRosterInviteBatch,
+  type ImportPreviewState,
+  type RosterCommitState,
+} from '@/lib/actions/roster'
 
 const previewInitial: ImportPreviewState = {}
-const commitInitial: ActionState = {}
+const commitInitial: RosterCommitState = {}
+
+/** How many invites one request sends, and how long to pause between
+ * requests — see sendRosterInviteBatch's doc comment for why this is
+ * batched client-side instead of one big server-side loop. */
+const INVITE_BATCH_SIZE = 20
+const INVITE_BATCH_PAUSE_MS = 500
+
+type InviteProgress = {
+  total: number
+  done: number
+  failed: { name: string; email: string }[]
+}
 
 const STATUS_TONE: Record<'ok' | 'duplicate' | 'invalid', string> = {
   ok: 'neutral',
@@ -49,8 +66,59 @@ function Wizard({ onDone }: { onDone: () => void }) {
   const [commitState, commitAction, commitPending] = useActionState(commitRosterImport, commitInitial)
   const [included, setIncluded] = useState<Set<number>>(new Set())
   const [createLogins, setCreateLogins] = useState(false)
+  const [inviteProgress, setInviteProgress] = useState<InviteProgress | null>(null)
 
   const preview = previewState.preview
+  const pendingInvites = commitState.pendingInvites
+
+  // Drive the invite send in small, paced batches once a commit hands back
+  // newly-created people still waiting on one — see sendRosterInviteBatch.
+  // Runs once per distinct pendingInvites array (a fresh commit always
+  // produces a new array reference; re-renders from state updates below
+  // reuse the same one, so this doesn't restart mid-send).
+  useEffect(() => {
+    if (!pendingInvites || pendingInvites.length === 0) return
+    let cancelled = false
+
+    async function run() {
+      const people = pendingInvites!
+      const byId = new Map(people.map((p) => [p.id, p]))
+      const failed: { name: string; email: string }[] = []
+      let done = 0
+      setInviteProgress({ total: people.length, done: 0, failed: [] })
+
+      for (let i = 0; i < people.length; i += INVITE_BATCH_SIZE) {
+        if (cancelled) return
+        const batchIds = people.slice(i, i + INVITE_BATCH_SIZE).map((p) => p.id)
+        const result = await sendRosterInviteBatch(batchIds)
+
+        if ('results' in result) {
+          for (const r of result.results) {
+            done++
+            if (!r.ok) failed.push({ name: byId.get(r.personId)?.name ?? r.email, email: r.email })
+          }
+        } else {
+          // The whole batch call failed (e.g. a session hiccup) — count
+          // every id in it as failed rather than losing track of them.
+          for (const id of batchIds) {
+            done++
+            const person = byId.get(id)
+            failed.push({ name: person?.name ?? '', email: person?.email ?? '' })
+          }
+        }
+
+        if (!cancelled) setInviteProgress({ total: people.length, done, failed: [...failed] })
+        if (!cancelled && i + INVITE_BATCH_SIZE < people.length) {
+          await new Promise((resolve) => setTimeout(resolve, INVITE_BATCH_PAUSE_MS))
+        }
+      }
+    }
+
+    run()
+    return () => {
+      cancelled = true
+    }
+  }, [pendingInvites])
 
   // A fresh preview defaults to every ready row selected. Adjusted during
   // render rather than in a useEffect — see use-close-on-success.ts for why.
@@ -79,11 +147,21 @@ function Wizard({ onDone }: { onDone: () => void }) {
   }
 
   if (commitState.ok) {
+    const sending = inviteProgress && inviteProgress.done < inviteProgress.total
     return (
       <div className="grid gap-4">
         <Notice tone="success">{commitState.ok}</Notice>
+        {inviteProgress ? (
+          <Notice tone={sending ? 'info' : inviteProgress.failed.length > 0 ? 'error' : 'success'}>
+            {sending
+              ? `Sending portal invites… ${inviteProgress.done} of ${inviteProgress.total}`
+              : inviteProgress.failed.length === 0
+                ? `All ${inviteProgress.total} portal invite${inviteProgress.total === 1 ? '' : 's'} sent.`
+                : `Sent ${inviteProgress.total - inviteProgress.failed.length} of ${inviteProgress.total} portal invites. ${inviteProgress.failed.length} didn't go through — use "Send login invite" from their row on the roster to retry: ${inviteProgress.failed.map((f) => f.name || f.email).join(', ')}`}
+          </Notice>
+        ) : null}
         <div>
-          <Button variant="ghost" onClick={onDone}>
+          <Button variant="ghost" onClick={onDone} disabled={Boolean(sending)}>
             Import another file
           </Button>
         </div>
