@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState as useReactActionState } from 'react'
+import { unstable_isUnrecognizedActionError } from 'next/navigation'
 
 /**
  * A drop-in replacement for React's useActionState that retries a failed
@@ -51,8 +52,30 @@ import { useActionState as useReactActionState } from 'react'
  * duplicate charge or a duplicate payout — those still require a separate,
  * deliberate approval step. Given every real failure so far shows zero
  * partial writes, a couple of retries is worth that small residual risk.
+ *
+ * One failure mode is worth calling out on its own: a deploy landing while
+ * someone already has the page open. Their browser is still holding a
+ * reference to the specific server build that rendered it; once a new build
+ * is live, that reference doesn't exist anymore and every action call
+ * against it fails identically — Next.js labels this precisely
+ * (unstable_isUnrecognizedActionError). Retrying does nothing here (the
+ * reference is exactly as stale on attempt three as attempt one, so those
+ * two retries just make the person wait ~2s for a foregone conclusion)
+ * — found live on 2026-09-02 when a partner admin's password change landed
+ * in this exact window (two deploys touched that same form within the hour)
+ * and came back "the connection hiccuped," which reads as transient and
+ * invites the one thing that can't fix it: trying again on the same page.
+ * The actual fix is a fresh page load, which picks up the current build's
+ * action references — and since this app's session lives in a cookie set by
+ * the server, not in this retry loop's closure, a reload doesn't cost them
+ * their sign-in, only whatever was in the form. So this case skips the
+ * remaining retries, says plainly that the page just updated, and reloads
+ * itself shortly after — the one case where letting the error escape this
+ * hook's normal `{ error }` fallback and act on the page directly is the
+ * more honest response, not a bigger crash.
  */
 const RETRY_DELAYS_MS = [600, 1500]
+const STALE_BUILD_RELOAD_DELAY_MS = 1200
 
 export function useActionState<State extends { error?: string }, Payload>(
   action: (state: Awaited<State>, payload: Payload) => State | Promise<State>,
@@ -69,6 +92,14 @@ export function useActionState<State extends { error?: string }, Payload>(
       try {
         return await action(state, payload)
       } catch (err) {
+        if (unstable_isUnrecognizedActionError(err)) {
+          if (typeof window !== 'undefined') {
+            window.setTimeout(() => window.location.reload(), STALE_BUILD_RELOAD_DELAY_MS)
+          }
+          return {
+            error: 'This page updated while you had it open — refreshing automatically…',
+          } as State
+        }
         lastError = err
       }
     }
