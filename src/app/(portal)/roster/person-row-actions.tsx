@@ -7,7 +7,7 @@ import { useCloseOnSuccess } from '@/lib/use-close-on-success'
 import { Button, Field, Pill, inputClass } from '@/components/ui'
 import { ConfirmDialog } from '@/components/dialog'
 import { PermissionGridButton } from '@/components/permission-grid'
-import { editPerson, enablePortalLogin, setPersonActive } from '@/lib/actions/roster'
+import { editPerson, enablePortalLogin, promoteToPartnerAdmin, setPersonActive } from '@/lib/actions/roster'
 import type { ActionState } from '@/lib/actions/deals'
 import type { RosterRow } from '@/lib/data/roster'
 import type { TeamOption } from '@/lib/types'
@@ -28,6 +28,7 @@ export function PersonRowActions({
   teams,
   canWrite,
   canManagePerms,
+  canPromote,
 }: {
   person: RosterRow
   teams: TeamOption[]
@@ -35,17 +36,24 @@ export function PersonRowActions({
   /** Only a Clear Brands admin or the person's own partner admin may grant or
    *  revoke capabilities — an internal manager sees the roster but not this. */
   canManagePerms: boolean
+  /** Only Clear Brands staff may promote a rep-level login to partner admin —
+   *  see the comment on promoteToPartnerAdmin in lib/actions/roster.ts. */
+  canPromote: boolean
 }) {
   const [editState, editAction, editPending] = useActionState(editPerson, initial)
   const [activeState, activeAction, activePending] = useActionState(setPersonActive, initial)
   const [inviteState, inviteAction, invitePending] = useActionState(enablePortalLogin, initial)
+  const [promoteState, promoteAction, promotePending] = useActionState(promoteToPartnerAdmin, initial)
 
   const [editOpen, setEditOpen] = useState(false)
   const [deactivateOpen, setDeactivateOpen] = useState(false)
+  const [promoteOpen, setPromoteOpen] = useState(false)
 
   useCloseOnSuccess(editState.ok, setEditOpen)
 
   useCloseOnSuccess(activeState.ok, setDeactivateOpen)
+
+  useCloseOnSuccess(promoteState.ok, setPromoteOpen)
 
   if (!canWrite) return null
 
@@ -88,6 +96,12 @@ export function PersonRowActions({
             perms: person.login.perms,
           }}
         />
+      ) : null}
+
+      {person.login && person.login.role === 'member' && canPromote ? (
+        <Button size="sm" variant="ghost" onClick={() => setPromoteOpen(true)}>
+          Promote to partner admin
+        </Button>
       ) : null}
 
       {person.hasLogin ? <Pill tone="neutral">Has login</Pill> : null}
@@ -148,6 +162,18 @@ export function PersonRowActions({
         error={activeState.error}
         formAction={activeAction}
         hiddenFields={{ personId: person.id, active: 'false' }}
+      />
+
+      <ConfirmDialog
+        open={promoteOpen}
+        onClose={() => setPromoteOpen(false)}
+        title={`Promote ${person.name} to partner admin?`}
+        description="They keep the same login and password — this only changes what they can see and do. Partner admins can see payouts and rev-share for their whole company, and manage the roster. You can't undo this from here afterward — ask engineering if you need to reverse it."
+        confirmLabel="Promote"
+        pending={promotePending}
+        error={promoteState.error}
+        formAction={promoteAction}
+        hiddenFields={{ personId: person.id }}
       />
     </div>
   )

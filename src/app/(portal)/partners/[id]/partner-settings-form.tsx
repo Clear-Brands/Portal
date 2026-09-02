@@ -75,6 +75,20 @@ export function PartnerSettingsForm({ partner }: { partner: Partner }) {
         </div>
       </div>
 
+      <div className="border-t border-line pt-4">
+        <Field
+          label="Self-serve signup domains"
+          hint="Comma-separated, e.g. fieldpulse.com. A rep or partner admin whose email ends in one of these can create their own portal login at /signup — matched to this partner automatically. Leave blank to keep self-serve signup off."
+        >
+          <input
+            name="signupDomains"
+            defaultValue={partner.signupDomains.join(', ')}
+            placeholder="fieldpulse.com"
+            className={inputClass}
+          />
+        </Field>
+      </div>
+
       {state.error ? <Notice tone="error">{state.error}</Notice> : null}
       {state.ok ? <Notice tone="success">{state.ok}</Notice> : null}
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 
 import { useActionState } from '@/lib/use-resilient-action'
@@ -123,6 +124,12 @@ export function LoginForm() {
 
         <p className="mt-6 text-center text-[12.5px] text-muted">
           Trouble signing in? Ask Clear Brands to check you&rsquo;re on the roster.
+        </p>
+        <p className="mt-2 text-center text-[12.5px] text-muted">
+          New here?{' '}
+          <Link href="/signup" className="text-volt underline underline-offset-4">
+            Create your account
+          </Link>
         </p>
       </div>
     </main>

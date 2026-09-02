@@ -81,6 +81,10 @@ export interface Partner {
   selfServeDealsEnabled: boolean
   brandAccent: string
   archivedAt: string | null
+  /** Email domains that auto-match a self-serve signup to this partner —
+   *  see 0032_partner_signup_domains.sql. Empty means self-serve signup is
+   *  off for this partner. */
+  signupDomains: string[]
 }
 
 export interface PartnerAsset {
@@ -258,6 +262,7 @@ export function toPartner(row: Row): Partner {
     selfServeDealsEnabled: row.self_serve_deals_enabled !== false,
     brandAccent: (row.brand_accent as string) ?? '#C8F52F',
     archivedAt: (row.archived_at as string) ?? null,
+    signupDomains: (row.signup_domains as string[] | null) ?? [],
   }
 }
 

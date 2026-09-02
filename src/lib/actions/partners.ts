@@ -398,7 +398,23 @@ const UpdateProfile = z.object({
   competitionsEnabled: z.string().optional(),
   annualEnabled: z.string().optional(),
   selfServeDealsEnabled: z.string().optional(),
+  signupDomains: z.string().trim().optional().default(''),
 })
+
+const DOMAIN_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/
+
+/** Turns "FieldPulse.com, @acme.io  bad domain" into a clean, deduped list of
+ *  lowercase domains, silently dropping anything that isn't a real-looking
+ *  domain rather than erroring — this is a comma/space-separated free-text
+ *  field, not a strict form. */
+function parseSignupDomains(raw: string): string[] {
+  const seen = new Set<string>()
+  for (const piece of raw.split(/[,\s]+/)) {
+    const domain = piece.trim().toLowerCase().replace(/^@/, '')
+    if (domain && DOMAIN_RE.test(domain)) seen.add(domain)
+  }
+  return [...seen]
+}
 
 /** Branding and feature toggles — everything except rates. */
 export async function updatePartnerProfile(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -426,6 +442,7 @@ export async function updatePartnerProfile(_prev: ActionState, formData: FormDat
       competitions_enabled: input.competitionsEnabled === 'on',
       annual_enabled: input.annualEnabled === 'on',
       self_serve_deals_enabled: input.selfServeDealsEnabled === 'on',
+      signup_domains: parseSignupDomains(input.signupDomains),
     })
     .eq('id', input.partnerId)
 

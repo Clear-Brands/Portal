@@ -32,6 +32,10 @@ export default async function RosterPage({
   const showMoney = can(profile, 'spiffs.view') && (partner?.spiffsEnabled ?? true)
   const canManagePerms =
     (profile.role === 'internal' && profile.access === 'admin') || profile.role === 'partner_admin'
+  // Promoting a rep-level login to partner admin is internal-only — RLS
+  // itself refuses this from a partner admin's session, see the comment on
+  // promoteToPartnerAdmin in src/lib/actions/roster.ts.
+  const canPromote = profile.role === 'internal' && canWrite
 
   const pods: PodTab[] = [
     { value: '', label: 'All pods', color: null, count: podCounts.all },
@@ -145,6 +149,7 @@ export default async function RosterPage({
                       teams={podCounts.teams}
                       canWrite={canWrite}
                       canManagePerms={canManagePerms}
+                      canPromote={canPromote}
                     />
                   </div>
                 ) : null}
@@ -223,6 +228,7 @@ export default async function RosterPage({
                           teams={podCounts.teams}
                           canWrite={canWrite}
                           canManagePerms={canManagePerms}
+                          canPromote={canPromote}
                         />
                       </Td>
                     ) : null}

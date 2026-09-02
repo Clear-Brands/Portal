@@ -573,6 +573,57 @@ export async function sendRosterInviteBatch(personIds: string[]): Promise<Invite
 }
 
 /* -------------------------------------------------------------------------- */
+/* Promoting a member login to partner admin                                   */
+/* -------------------------------------------------------------------------- */
+
+const PromoteToAdmin = z.object({ personId: z.guid() })
+
+/**
+ * The other half of self-serve signup (src/app/signup/actions.ts): every new
+ * account lands as an ordinary rep, and Clear Brands gets an email so they
+ * can promote the right ones. Internal-only, and deliberately so — a partner
+ * admin's own update policy (`profiles_update_partner_admin` in
+ * 0008_rls.sql) is written so it can never move a profile's role off
+ * 'member' even if this check were bypassed; only `profiles_write_internal`
+ * allows it, so this runs on the ordinary session-scoped client rather than
+ * the admin client and lets RLS itself be the backstop, same as everywhere
+ * else in this file.
+ *
+ * Pod assignment doesn't need a new action — it's already the "Pod" field on
+ * the existing Edit action, which any people.write login (including a
+ * partner admin) can already use.
+ */
+export async function promoteToPartnerAdmin(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const profile = await requireSession()
+  if (profile.role !== 'internal' || !can(profile, 'people.write')) {
+    return { error: "Only Clear Brands staff can change someone's role." }
+  }
+
+  const parsed = PromoteToAdmin.safeParse(Object.fromEntries(formData))
+  if (!parsed.success) return { error: 'Something is missing there — try again.' }
+
+  const supabase = await createClient()
+  const { data: existing } = await supabase
+    .from('profiles')
+    .select('id, role')
+    .eq('person_id', parsed.data.personId)
+    .maybeSingle()
+
+  if (!existing) return { error: 'This person does not have a portal login yet.' }
+  if (existing.role !== 'member') return { error: 'Only a rep-level login can be promoted.' }
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ role: 'partner_admin', access: 'none' })
+    .eq('id', existing.id)
+
+  if (error) return { error: friendly(error.message) }
+
+  revalidatePath('/roster')
+  return { ok: 'Promoted to partner admin. Same login, no new invite needed.' }
+}
+
+/* -------------------------------------------------------------------------- */
 
 function friendly(message: string): string {
   if (message.includes('violates row-level security') || message.includes('42501')) {
