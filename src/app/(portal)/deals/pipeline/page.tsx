@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 
 import { can } from '@/lib/auth/capabilities'
 import { requireSession } from '@/lib/session'
@@ -16,6 +17,8 @@ export default async function PipelinePage({
 }) {
   const profile = await requireSession()
   const partner = await getActivePartner()
+  // Direct-URL backstop for the nav gate in the portal layout — see /deals.
+  if (!(partner?.dealsEnabled ?? true)) redirect('/')
   const params = await searchParams
   const churnedParam = params.churned
   const churned = (Array.isArray(churnedParam) ? churnedParam[0] : churnedParam) === '1'

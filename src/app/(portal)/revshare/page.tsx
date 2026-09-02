@@ -1,3 +1,5 @@
+import { redirect } from 'next/navigation'
+
 import { can } from '@/lib/auth/capabilities'
 import { requireSession } from '@/lib/session'
 import { getActivePartner } from '@/lib/partner-context'
@@ -17,6 +19,8 @@ export const metadata = { title: 'Rev share' }
 export default async function RevsharePage() {
   const profile = await requireSession()
   const partner = await getActivePartner()
+  // Direct-URL backstop for the nav gate in the portal layout.
+  if (!(partner?.revshareEnabled ?? true)) redirect('/')
 
   const [accounts, statements, headline] = await Promise.all([
     listLiveAccounts(),

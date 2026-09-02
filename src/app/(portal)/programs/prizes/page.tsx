@@ -1,3 +1,5 @@
+import { redirect } from 'next/navigation'
+
 import { can } from '@/lib/auth/capabilities'
 import { requireSession } from '@/lib/session'
 import { getActivePartner } from '@/lib/partner-context'
@@ -25,6 +27,8 @@ const SOURCE_LABEL: Record<string, string> = {
 export default async function PrizesPage() {
   const profile = await requireSession()
   const partner = await getActivePartner()
+  // Direct-URL backstop for the nav gate in the portal layout — see /programs.
+  if (!(partner?.competitionsEnabled ?? true) && !(partner?.annualEnabled ?? true)) redirect('/programs')
   const canExport = can(profile, 'exports.run')
   const canApprove = can(profile, 'payouts.write')
 

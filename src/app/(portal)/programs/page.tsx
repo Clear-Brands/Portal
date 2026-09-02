@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 
 import { can } from '@/lib/auth/capabilities'
 import { requireSession } from '@/lib/session'
@@ -13,12 +14,17 @@ export const metadata = { title: 'Programs' }
 export default async function ProgramsPage() {
   const profile = await requireSession()
   const partner = await getActivePartner()
+  const competitionsEnabled = partner?.competitionsEnabled ?? true
+  const annualEnabled = partner?.annualEnabled ?? true
+  // Direct-URL backstop for the nav gate in the portal layout — the nav item
+  // covers both toggles at once, so this only blocks when neither is on.
+  if (!competitionsEnabled && !annualEnabled) redirect('/')
   const today = await partnerToday()
 
   const [competitions, sprints, goals] = await Promise.all([
-    listCompetitions(),
-    listSprints(),
-    listAnnualGoals(),
+    competitionsEnabled ? listCompetitions() : Promise.resolve([]),
+    competitionsEnabled ? listSprints() : Promise.resolve([]),
+    annualEnabled ? listAnnualGoals() : Promise.resolve([]),
   ])
 
   const canManage = can(profile, 'programs.write')
@@ -69,40 +75,42 @@ export default async function ProgramsPage() {
         </div>
       </div>
 
-      {running.length === 0 && past.length === 0 ? (
-        <Card>
-          <p className="text-[14px] text-muted">
-            Nothing is running right now.{' '}
-            {canManage ? (
-              <>
-                <Link href="/programs/new" className="text-volt hover:underline">
-                  Start a competition or sprint
-                </Link>
-                .
-              </>
+      {competitionsEnabled ? (
+        running.length === 0 && past.length === 0 ? (
+          <Card>
+            <p className="text-[14px] text-muted">
+              Nothing is running right now.{' '}
+              {canManage ? (
+                <>
+                  <Link href="/programs/new" className="text-volt hover:underline">
+                    Start a competition or sprint
+                  </Link>
+                  .
+                </>
+              ) : null}
+            </p>
+          </Card>
+        ) : (
+          <>
+            {running.length > 0 ? (
+              <section>
+                <div className="grid gap-4">{running.map((c) => c.node)}</div>
+              </section>
             ) : null}
-          </p>
-        </Card>
-      ) : (
-        <>
-          {running.length > 0 ? (
-            <section>
-              <div className="grid gap-4">{running.map((c) => c.node)}</div>
-            </section>
-          ) : null}
 
-          {past.length > 0 ? (
-            <details className="mt-8">
-              <summary className="cursor-pointer font-head text-[15px] tracking-[0.04em] text-paper uppercase">
-                Past ({past.length})
-              </summary>
-              <div className="mt-4 grid gap-4">{past.map((c) => c.node)}</div>
-            </details>
-          ) : null}
-        </>
-      )}
+            {past.length > 0 ? (
+              <details className="mt-8">
+                <summary className="cursor-pointer font-head text-[15px] tracking-[0.04em] text-paper uppercase">
+                  Past ({past.length})
+                </summary>
+                <div className="mt-4 grid gap-4">{past.map((c) => c.node)}</div>
+              </details>
+            ) : null}
+          </>
+        )
+      ) : null}
 
-      <AnnualGoalsSection goals={goals} canApprove={canApprove} />
+      {annualEnabled ? <AnnualGoalsSection goals={goals} canApprove={canApprove} /> : null}
     </>
   )
 }

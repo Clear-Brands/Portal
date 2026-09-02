@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 
 import { can } from '@/lib/auth/capabilities'
 import { requireSession } from '@/lib/session'
@@ -29,6 +29,8 @@ export default async function DealDetailPage({
 }) {
   const profile = await requireSession()
   const partner = await getActivePartner()
+  // Direct-URL backstop for the nav gate in the portal layout — see /deals.
+  if (!(partner?.dealsEnabled ?? true)) redirect('/')
   const { id } = await params
 
   const deal = await getDeal(id)

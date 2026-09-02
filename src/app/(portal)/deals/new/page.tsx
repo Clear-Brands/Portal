@@ -14,6 +14,8 @@ export default async function NewDealPage() {
   if (!can(profile, 'deals.write')) redirect('/deals')
 
   const partner = await getActivePartner()
+  // Direct-URL backstop for the nav gate in the portal layout — see /deals.
+  if (!(partner?.dealsEnabled ?? true)) redirect('/')
   const people = await searchPeople('', 25)
 
   return (

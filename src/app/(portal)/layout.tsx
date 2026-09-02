@@ -58,7 +58,35 @@ const ROLE_LABEL: Record<string, string> = {
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const profile = await requireSession()
-  const items = (NAV[profile.role] ?? []).filter((i) => !i.capability || can(profile, i.capability))
+
+  // Fetched for every role, not just internal (previously only internal
+  // needed it, for the partner switcher) — the feature-toggle gate right
+  // below needs to know the current partner's flags no matter who's looking.
+  const [switchablePartners, activePartner] = await Promise.all([
+    profile.role === 'internal' ? listSwitchablePartners() : Promise.resolve([]),
+    getActivePartner(),
+  ])
+
+  // A partner's own Feature toggles (Partners page → "Deals" / "Rev share" /
+  // "Competitions & sprints" / "Closers Club") used to only ever get saved —
+  // nothing downstream read them back, so turning a feature off never
+  // actually hid it from anyone (Charles, Sept 2: "this settings don't seem
+  // to be working"). This is the read side, applied to everyone — Clear
+  // Brands staff included — while /partners/[id] itself (where the toggles
+  // live) stays reachable regardless, since that's how a feature gets turned
+  // back on. Programs covers two toggles at once (competitions/sprints and
+  // Closers Club both live on that one page), so it only disappears once
+  // both are off; which section(s) render is handled on the page itself.
+  const featureGate: Record<string, boolean> = {
+    '/deals': activePartner?.dealsEnabled ?? true,
+    '/my-deals': activePartner?.dealsEnabled ?? true,
+    '/revshare': activePartner?.revshareEnabled ?? true,
+    '/programs': (activePartner?.competitionsEnabled ?? true) || (activePartner?.annualEnabled ?? true),
+  }
+
+  const items = (NAV[profile.role] ?? [])
+    .filter((i) => !i.capability || can(profile, i.capability))
+    .filter((i) => featureGate[i.href] ?? true)
 
   // Admin-only and gated on access level rather than a capability, so it can't
   // just live in NAV's static, capability-filtered table above — same "who
@@ -70,11 +98,6 @@ export default async function PortalLayout({ children }: { children: React.React
     const teamItem = { href: '/clear-brands-team', label: 'Clear Brands team' }
     items.splice(partnersIdx >= 0 ? partnersIdx + 1 : items.length, 0, teamItem)
   }
-
-  const [switchablePartners, activePartner] =
-    profile.role === 'internal'
-      ? await Promise.all([listSwitchablePartners(), getActivePartner()])
-      : [[], null]
 
   return (
     <div className="min-h-dvh">

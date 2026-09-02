@@ -14,6 +14,8 @@ export default async function NewProgramPage() {
   if (!can(profile, 'programs.write')) redirect('/programs')
 
   const partner = await getActivePartner()
+  // Direct-URL backstop for the nav gate in the portal layout — see /programs.
+  if (!(partner?.competitionsEnabled ?? true) && !(partner?.annualEnabled ?? true)) redirect('/programs')
   const teams = await listTeamOptions()
 
   return (
