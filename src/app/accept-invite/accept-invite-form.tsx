@@ -29,6 +29,11 @@ type Status = 'checking' | 'ready' | 'link-error'
 export function AcceptInviteForm() {
   const [status, setStatus] = useState<Status>('checking')
   const [state, action, pending] = useActionState(setInitialPassword, initial)
+  // Supabase puts `type` (invite | recovery) in the same hash as the tokens.
+  // Carried through as a hidden field so the server action can send a
+  // brand-new partner admin somewhere more useful than a returning user
+  // resetting their password — see the comment on setInitialPassword.
+  const [flow, setFlow] = useState<string>('')
 
   useEffect(() => {
     // The `await` before every setStatus below is deliberate, not just a
@@ -45,6 +50,8 @@ export function AcceptInviteForm() {
       const params = new URLSearchParams(hash)
       const access_token = params.get('access_token')
       const refresh_token = params.get('refresh_token')
+      const type = params.get('type')
+      if (type && !cancelled) setFlow(type)
 
       if (!access_token || !refresh_token) {
         await Promise.resolve()
@@ -95,6 +102,8 @@ export function AcceptInviteForm() {
             </Notice>
           ) : (
             <form action={action} className="grid gap-4">
+              <input type="hidden" name="flow" value={flow} />
+
               <p className="text-[13.5px] text-muted">
                 Choose a password. You&rsquo;ll use it to sign back in next time.
               </p>

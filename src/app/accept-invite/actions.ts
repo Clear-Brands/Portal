@@ -26,6 +26,14 @@ const NewPassword = z
  * this page loaded with no fragment to begin with — getUser() comes back
  * empty and this reports the same "ask for a new invite" story rather than
  * a confusing generic error.
+ *
+ * Where it sends people afterward differs by flow. A `recovery` (reset
+ * password) always lands on `/` — Charles confirmed that one's fine as-is.
+ * An `invite` for a brand-new partner admin instead goes to `/revshare`
+ * (Charles, Sept 2: "the welcome link should take us to Partner admin page
+ * once logged on" — clarified as the Rev share tab specifically). Any other
+ * invite (an internal login, a rep's roster invite) falls back to `/`,
+ * since `/revshare` isn't even in a member's nav.
  */
 export async function setInitialPassword(
   _prev: AcceptInviteState,
@@ -53,6 +61,16 @@ export async function setInitialPassword(
 
   if (error) {
     return { error: 'Could not set your password. Try again.' }
+  }
+
+  if (formData.get('flow') === 'invite') {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (profile?.role === 'partner_admin') redirect('/revshare')
   }
 
   redirect('/')
