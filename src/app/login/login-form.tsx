@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation'
 
 import { useActionState } from '@/lib/use-resilient-action'
 import { Button, Field, Notice, inputClass } from '@/components/ui'
-import { sendSignInLink, signInWithPassword, type AuthState } from './actions'
+import { sendPasswordReset, sendSignInLink, signInWithPassword, type AuthState } from './actions'
 
 const initial: AuthState = {}
 
@@ -15,12 +15,13 @@ export function LoginForm() {
   const next = params.get('next') ?? '/'
   const linkError = params.get('error')
 
-  const [mode, setMode] = useState<'password' | 'link'>('password')
+  const [mode, setMode] = useState<'password' | 'link' | 'reset'>('password')
   const [passwordState, passwordAction, passwordPending] = useActionState(
     signInWithPassword,
     initial,
   )
   const [linkState, linkAction, linkPending] = useActionState(sendSignInLink, initial)
+  const [resetState, resetAction, resetPending] = useActionState(sendPasswordReset, initial)
 
   return (
     <main className="flex min-h-dvh items-center justify-center px-5 py-16">
@@ -71,15 +72,24 @@ export function LoginForm() {
                 {passwordPending ? 'Signing in…' : 'Sign in'}
               </Button>
 
-              <button
-                type="button"
-                onClick={() => setMode('link')}
-                className="text-[13px] text-muted underline underline-offset-4 hover:text-paper"
-              >
-                Email me a sign-in link instead
-              </button>
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setMode('link')}
+                  className="text-[13px] text-muted underline underline-offset-4 hover:text-paper"
+                >
+                  Email me a sign-in link instead
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode('reset')}
+                  className="text-[13px] text-muted underline underline-offset-4 hover:text-paper"
+                >
+                  Forgot your password?
+                </button>
+              </div>
             </form>
-          ) : (
+          ) : mode === 'link' ? (
             <form action={linkAction} className="grid gap-4">
               {linkState.sent ? (
                 <Notice tone="success">
@@ -107,6 +117,46 @@ export function LoginForm() {
 
                   <Button type="submit" disabled={linkPending}>
                     {linkPending ? 'Sending…' : 'Send me a link'}
+                  </Button>
+                </>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setMode('password')}
+                className="text-[13px] text-muted underline underline-offset-4 hover:text-paper"
+              >
+                Use a password instead
+              </button>
+            </form>
+          ) : (
+            <form action={resetAction} className="grid gap-4">
+              {resetState.sent ? (
+                <Notice tone="success">
+                  If that address is on the portal, a link to reset your password is on its way.
+                  It is good for one use and expires in an hour.
+                </Notice>
+              ) : (
+                <>
+                  <p className="text-[13.5px] text-muted">
+                    We&rsquo;ll email you a link to set a new password.
+                  </p>
+
+                  <Field label="Email">
+                    <input
+                      className={inputClass}
+                      type="email"
+                      name="email"
+                      autoComplete="username"
+                      required
+                      autoFocus
+                    />
+                  </Field>
+
+                  {resetState.error ? <Notice tone="error">{resetState.error}</Notice> : null}
+
+                  <Button type="submit" disabled={resetPending}>
+                    {resetPending ? 'Sending…' : 'Send reset link'}
                   </Button>
                 </>
               )}

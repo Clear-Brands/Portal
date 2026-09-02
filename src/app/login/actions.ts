@@ -120,6 +120,44 @@ export async function sendSignInLink(
   return { sent: true }
 }
 
+export async function sendPasswordReset(
+  _prev: AuthState,
+  formData: FormData,
+): Promise<AuthState> {
+  const parsed = EmailOnly.safeParse({ email: formData.get('email') })
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Enter a valid email address' }
+  }
+
+  const ip = await requestIp()
+  const byEmail = checkRateLimit(`pwreset:email:${parsed.data.email.toLowerCase()}`, 4, 15 * 60)
+  const byIp = checkRateLimit(`pwreset:ip:${ip}`, 15, 15 * 60)
+  if (!byEmail.allowed || !byIp.allowed) {
+    return { error: TOO_MANY_ATTEMPTS }
+  }
+
+  // Same mechanics as sendPartnerAdminPasswordReset in lib/actions/partners.ts
+  // (a Supabase `type=recovery` link, redirected to /accept-invite — see the
+  // comment there for why one page handles both invite and recovery), except
+  // this is the self-serve version: anyone with a login can trigger it from
+  // /login, not just an admin resetting someone else's. Runs on the ordinary
+  // session-bound client, same as sendSignInLink above — resetPasswordForEmail
+  // needs no elevated privileges.
+  const supabase = await createClient()
+  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/accept-invite`,
+  })
+
+  if (error) {
+    return { error: 'We could not send that link right now. Try again in a moment.' }
+  }
+
+  // Always reports success, whether or not the address exists — same
+  // anti-enumeration reasoning as sendSignInLink.
+  return { sent: true }
+}
+
 export async function signOut() {
   const supabase = await createClient()
   await supabase.auth.signOut()
