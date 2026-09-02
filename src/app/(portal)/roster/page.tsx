@@ -10,6 +10,7 @@ import { Pagination } from '@/components/pagination'
 import { RosterFilterBar, type PodTab } from './roster-filter-bar'
 import { PersonRowActions } from './person-row-actions'
 import { AddPersonButton } from './add-person-button'
+import { PodManager } from './pod-manager'
 
 export const metadata = { title: 'Roster' }
 
@@ -56,6 +57,7 @@ export default async function RosterPage({
 
         {canWrite ? (
           <div className="flex gap-2">
+            {profile.role === 'internal' ? <PodManager pods={podCounts.teams} /> : null}
             <AddPersonButton teams={podCounts.teams} canAddManager={profile.role === 'internal'} />
             <Button size="sm">
               <Link href="/roster/import">Import CSV</Link>
