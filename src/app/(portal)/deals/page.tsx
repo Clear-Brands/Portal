@@ -104,7 +104,9 @@ export default async function DealsPage({
               <Card key={deal.id}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="truncate text-paper">{deal.clientName}</div>
+                    <Link href={`/deals/${deal.id}`} className="block truncate text-paper hover:underline">
+                      {deal.clientName}
+                    </Link>
                     <div className="text-[12px] text-muted">
                       {[deal.services.join(', '), [deal.city, deal.state].filter(Boolean).join(', ')]
                         .filter(Boolean)
@@ -162,7 +164,9 @@ export default async function DealsPage({
                 {page.rows.map((deal) => (
                   <tr key={deal.id} className="align-top hover:bg-white/[0.025]">
                     <Td>
-                      <div className="text-paper">{deal.clientName}</div>
+                      <Link href={`/deals/${deal.id}`} className="text-paper hover:underline">
+                        {deal.clientName}
+                      </Link>
                       <div className="text-[12px] text-muted">
                         {[deal.service, [deal.city, deal.state].filter(Boolean).join(', ')]
                           .filter(Boolean)

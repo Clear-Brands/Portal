@@ -54,11 +54,39 @@ type AdminClient = ReturnType<typeof createAdminClient>
  * real delivery seen so far (checked directly against webhook_events rows)
  * carries its full native contact/trigger payload instead of the clean
  * object above, the same way it ignores the Method dropdown. `contact_id`,
- * `first_name`, `last_name`, `email`, `city`, and `state` all happen to
- * still land at the same top-level keys either way, so those read fine as
- * BookingPayload. `rep_email` doesn't: see extractRepEmail() below for
- * where it actually lives and why a plain `body.rep_email` read (the
- * previous version of this file) never once matched.
+ * `first_name`, `last_name`, `email`, `city`, `state`, `phone`, and
+ * `company_name` all happen to still land at the same top-level keys either
+ * way, so those read fine as BookingPayload. `rep_email` doesn't: see
+ * extractRepEmail() below for where it actually lives and why a plain
+ * `body.rep_email` read (the previous version of this file) never once
+ * matched. Three more fields have the identical problem — Charles, Sept
+ * 2026: "Some of the data is pulling in... but not all of the data is
+ * pulling in" (services, comments, number of employees) — and for the same
+ * reason: GHL's native payload carries them under the literal question text
+ * from the form, not a clean key, and that text is account-specific and not
+ * something this route should hardcode a single guess at:
+ *
+ *   - Services       raw['Services'] — a real JSON array (e.g.
+ *                     ["Website Design","Paid Ads"]), confirmed against
+ *                     production webhook_events. Normalized to this app's
+ *                     SERVICE_OPTIONS labels where a mapping is known
+ *                     (extractServices() below); an unrecognized label is
+ *                     kept as-is rather than silently dropped.
+ *   - Comments        raw['Additional Information'] first — the one
+ *                     candidate confirmed, against a real test submission,
+ *                     to actually hold what someone typed ("Test comment").
+ *                     'Do you have any other comments?' exists on the same
+ *                     form but was empty on that submission, so it's kept
+ *                     only as a fallback, alongside 'Additional Notes'.
+ *                     body.notes (the documented shape) is still checked
+ *                     first in case a delivery ever honors it — same
+ *                     reasoning as body.rep_email above — but no real
+ *                     delivery seen so far has a top-level `notes` key at
+ *                     all.
+ *   - Employee count  raw['Number of employees '] — note the trailing
+ *                     space, part of the literal key GHL sends. No column
+ *                     existed for this until 0029; null when absent rather
+ *                     than 0, which would read as a real answer.
  */
 
 type BookingPayload = {
@@ -140,6 +168,80 @@ function extractRepEmail(body: BookingPayload, raw: RawPayload): string | undefi
 
   for (const candidate of candidates) {
     if (looksLikeEmail(candidate)) return candidate.toLowerCase()
+  }
+  return undefined
+}
+
+// GHL's real "Services" question ships a JSON array of its own free-text
+// labels, not this app's SERVICE_OPTIONS. Map the variants seen in
+// production; anything unrecognized is kept verbatim (trimmed) rather than
+// dropped, since services is a plain text[] column, not an enum — an
+// unmapped label still shows up on the deal, just not deduplicated against
+// the app's canonical spelling.
+const SERVICE_LABEL_MAP: Record<string, string> = {
+  'website design': 'Web Design',
+  'web design': 'Web Design',
+  'local seo': 'SEO',
+  seo: 'SEO',
+  'paid ads': 'Paid Ads',
+  lsa: 'LSA',
+  'local service ads': 'LSA',
+  'local services ads': 'LSA',
+}
+
+function normalizeServiceLabel(label: string): string {
+  const trimmed = label.trim()
+  return SERVICE_LABEL_MAP[trimmed.toLowerCase()] ?? trimmed
+}
+
+// raw['Services'] is the real shape (a JSON array) on every delivery seen so
+// far; a comma-joined string is accepted too in case a GET-style delivery
+// (query strings can't nest an array) or a future GHL change ever sends one.
+function extractServices(raw: RawPayload): string[] {
+  const candidates = [raw['Services'], raw.services]
+  for (const candidate of candidates) {
+    const values = Array.isArray(candidate)
+      ? candidate.map((v) => asString(v)).filter((v): v is string => !!v)
+      : (asString(candidate)?.split(',') ?? []).map((v) => v.trim()).filter(Boolean)
+    if (values.length > 0) return [...new Set(values.map(normalizeServiceLabel))]
+  }
+  return []
+}
+
+// See the file-level comment. 'Additional Information' is checked first
+// because it's the one candidate confirmed, against a real test submission,
+// to actually hold what someone typed ("Test comment") — 'Do you have any
+// other comments?' exists on the same form but was empty on that same
+// submission. body.notes and 'Additional Notes' stay in as candidates in
+// case either is what a given account's form actually uses instead.
+function extractComments(body: BookingPayload, raw: RawPayload): string {
+  const candidates = [
+    asString(body.notes),
+    asString(raw['Additional Information']),
+    asString(raw['Do you have any other comments?']),
+    asString(raw['Additional Notes']),
+  ]
+  for (const candidate of candidates) {
+    if (candidate) return candidate
+  }
+  return ''
+}
+
+// 'Number of employees ' (trailing space, part of the real key) is the
+// candidate confirmed against production data; digits are pulled out of
+// whatever's there so "34" and "34 employees" both parse the same way.
+// Returns undefined — not 0 — when nothing usable was found.
+function extractEmployeeCount(raw: RawPayload): number | undefined {
+  const candidates = [
+    asString(raw['Number of employees ']),
+    asString(raw['Number of employees']),
+    asString(raw['How many employees do you currently have? ']),
+    asString(raw['How many employees do you currently have?']),
+  ]
+  for (const candidate of candidates) {
+    if (!candidate) continue
+    const digits = candidate.replace(/[^\d]/g, '')
+    if (digits) return Number(digits)
   }
   return undefined
 }
@@ -287,7 +389,9 @@ async function handleBooking(request: NextRequest, body: BookingPayload, raw: Ra
       phone: body.phone?.trim() ?? '',
       city: body.city?.trim() ?? '',
       state: (body.state ?? '').trim().slice(0, 2).toUpperCase(),
-      promo_note: body.notes?.trim() ?? '',
+      services: extractServices(raw),
+      employee_count: extractEmployeeCount(raw) ?? null,
+      promo_note: extractComments(body, raw),
       status: 'submitted',
       spiff_amount: partner.default_spiff,
     })

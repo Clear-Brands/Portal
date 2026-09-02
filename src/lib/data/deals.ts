@@ -38,6 +38,7 @@ interface SearchRow {
   email: string
   city: string
   state: string
+  employee_count: number | null
   promo_note: string
   lost_reason: string
   churn_note: string
@@ -84,6 +85,7 @@ function toDealRow(r: SearchRow): DealRow {
     email: r.email ?? '',
     city: r.city ?? '',
     state: r.state ?? '',
+    employeeCount: r.employee_count ?? null,
     promoNote: r.promo_note ?? '',
     lostReason: r.lost_reason ?? '',
     churnNote: r.churn_note ?? '',

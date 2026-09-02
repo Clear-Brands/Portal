@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
 import { can } from '@/lib/auth/capabilities'
@@ -115,7 +116,9 @@ export default async function MyDealsPage({
                 <Card key={deal.id}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="truncate text-paper">{deal.clientName}</div>
+                      <Link href={`/deals/${deal.id}`} className="block truncate text-paper hover:underline">
+                        {deal.clientName}
+                      </Link>
                       <div className="text-[12px] text-muted">{deal.services.join(', ') || '—'}</div>
                     </div>
                     <span className="num shrink-0 text-[12px] text-muted">
@@ -157,7 +160,9 @@ export default async function MyDealsPage({
                   {page.rows.map((deal) => (
                     <tr key={deal.id} className="align-top hover:bg-white/[0.025]">
                       <td className="border-b border-line px-[22px] py-3.5 text-[14px]">
-                        <div className="text-paper">{deal.clientName}</div>
+                        <Link href={`/deals/${deal.id}`} className="text-paper hover:underline">
+                          {deal.clientName}
+                        </Link>
                         <div className="text-[12px] text-muted">{deal.services.join(', ') || '—'}</div>
                       </td>
                       <td className="border-b border-line px-[22px] py-3.5">

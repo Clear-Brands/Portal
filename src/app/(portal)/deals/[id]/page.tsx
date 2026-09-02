@@ -77,6 +77,10 @@ export default async function DealDetailPage({
                 value={[deal.city, deal.state].filter(Boolean).join(', ') || '—'}
               />
               <Row
+                label="Employees"
+                value={deal.employeeCount !== null ? String(deal.employeeCount) : '—'}
+              />
+              <Row
                 label="Rep"
                 value={
                   <>

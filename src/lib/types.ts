@@ -49,6 +49,9 @@ export interface Deal {
   email: string
   city: string
   state: string
+  /** From the GHL booking form's "Number of employees " question. Null when
+   *  unknown or unanswered — never 0, which would read as a real answer. */
+  employeeCount: number | null
   promoNote: string
   lostReason: string
   churnNote: string
@@ -223,6 +226,7 @@ export function toDeal(row: Row): Deal {
     email: (row.email as string) ?? '',
     city: (row.city as string) ?? '',
     state: (row.state as string) ?? '',
+    employeeCount: (row.employee_count as number | null) ?? null,
     promoNote: (row.promo_note as string) ?? '',
     lostReason: (row.lost_reason as string) ?? '',
     churnNote: (row.churn_note as string) ?? '',
